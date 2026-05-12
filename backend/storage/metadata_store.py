@@ -149,6 +149,25 @@ class MetadataStore:
     def get_chunk_texts(self) -> list[str]:
         return [c.text for c in self.get_all_chunks()]
 
+    def get_chunks_by_doc_id(self, doc_id: int) -> list[Chunk]:
+        """Retrieve all chunks for a given document, ordered by chunk_index."""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute(
+            "SELECT * FROM chunks WHERE doc_id = ? ORDER BY chunk_index",
+            (doc_id,),
+        )
+        rows = c.fetchall()
+        conn.close()
+        return [
+            Chunk(
+                id=r[0], doc_id=r[1], chunk_index=r[2], text=r[3],
+                article=r[4], section=r[5], subsection=r[6],
+                title=r[7], parent_article=r[8], strategy=r[9],
+            )
+            for r in rows
+        ]
+
     def get_chunk_count(self) -> int:
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
