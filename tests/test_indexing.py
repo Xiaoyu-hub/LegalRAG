@@ -324,6 +324,7 @@ class TestIndexer:
 
         # Now test Indexer
         from backend.pipeline.indexer import Indexer
+        from backend.embedding.embedder import Embedder
 
         indexer = Indexer(chunk_strategy="by_section", db_path=temp_db_path)
         doc_id = indexer.process_document(str(pdf_path))
