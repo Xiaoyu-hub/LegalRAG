@@ -71,4 +71,8 @@ class Embedder:
 
     @property
     def dimension(self) -> int:
-        return self.model.get_sentence_embedding_dimension()
+        # Use new API name; fall back to old one for older sentence-transformers
+        try:
+            return self.model.get_embedding_dimension()
+        except AttributeError:
+            return self.model.get_sentence_embedding_dimension()
