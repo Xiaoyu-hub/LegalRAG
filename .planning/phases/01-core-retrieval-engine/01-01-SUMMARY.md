@@ -152,6 +152,16 @@ None — no external service configuration required. All dependencies installabl
 - **Test infrastructure in place** — pytest suite, fixtures, and sample legal document available for all downstream testing
 - **sentence-transformers and faiss-cpu** still need installation (deferred to Plan 01-02 due to long install time)
 
+## Self-Check: PASSED
+
+- ✅ SUMMARY.md exists at `.planning/phases/01-core-retrieval-engine/01-01-SUMMARY.md`
+- ✅ Commit `751a584` exists (Task 1: test fixture + failing tests)
+- ✅ Commit `2ec514b` exists (Task 2: data models + PDF parser)
+- ✅ Commit `a5922a9` exists (Task 3: StructureExtractor, LegalChunker, MetadataStore)
+- ✅ Commit `3069043` exists (docs: SUMMARY.md)
+- ✅ All 14 tests pass
+- ✅ All 8 requirements completed (DOC-01~05, CHNK-01~03)
+
 ---
 *Phase: 01-core-retrieval-engine*
 *Completed: 2026-05-12*
