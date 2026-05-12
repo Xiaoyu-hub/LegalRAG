@@ -1,0 +1,83 @@
+Article I. General Provisions
+
+Section 1. Definitions
+
+(a) "Person" means any individual, corporation, partnership, association, or other legal entity recognized under applicable law, including any government or political subdivision thereof.
+
+(b) "Entity" means any organization or legal person recognized as having rights and duties under law, including but not limited to corporations, limited liability companies, partnerships, trusts, and governmental agencies.
+
+(c) "Writing" means any form of recorded communication, whether electronic or physical, including letters, memoranda, emails, and digital documents.
+
+(d) "Business Day" means any day other than Saturday, Sunday, or any legal holiday recognized by the jurisdiction in which the principal office of the relevant party is located.
+
+Section 2. Scope of Application
+
+(a) This Regulation shall apply to all legal persons operating within the jurisdiction, regardless of their place of incorporation or principal place of business.
+
+(b) Exemptions may be granted by the Regulatory Authority for entities that demonstrate compliance with equivalent regulatory standards in their home jurisdiction.
+
+(c) The provisions of this Regulation shall not apply to activities conducted by governmental entities in the exercise of sovereign authority.
+
+Section 3. Interpretation
+
+(a) Words importing the singular include the plural and vice versa, unless the context otherwise requires.
+
+(b) References to any statute or regulation shall be construed as references to such statute or regulation as amended, re-enacted, or consolidated from time to time.
+
+(c) Headings and titles are included for convenience only and shall not affect the interpretation of this Regulation.
+
+Article II. Rights and Obligations
+
+Section 1. Data Protection Rights
+
+(a) Every data subject shall have the right to access any personal data held by a data controller relating to them, subject to the limitations set forth in Section 4 of this Article.
+
+(b) Data subjects shall have the right to request rectification of inaccurate personal data without undue delay.
+
+(c) Data subjects shall have the right to erasure of personal data ("right to be forgotten") where the data is no longer necessary for the purpose for which it was collected.
+
+(d) Data subjects shall have the right to data portability, enabling them to receive their personal data in a structured, commonly used, and machine-readable format.
+
+Section 2. Obligations of Data Controllers
+
+(a) Data controllers shall implement appropriate technical and organizational measures to ensure a level of security appropriate to the risk, including encryption, access controls, and regular security assessments.
+
+(b) Data controllers shall notify the Regulatory Authority of any personal data breach within seventy-two (72) hours of becoming aware of it, unless the breach is unlikely to result in a risk to the rights and freedoms of natural persons.
+
+(c) Data controllers shall maintain a record of all processing activities under their responsibility and make such record available to the Regulatory Authority upon request.
+
+Section 3. Data Processing Agreements
+
+(a) Where processing is to be carried out on behalf of a data controller, the controller shall use only processors providing sufficient guarantees to implement appropriate technical and organizational measures.
+
+(b) The processing shall be governed by a contract or other legal act that is binding on the processor with regard to the controller and that sets out the subject matter and duration of the processing, the nature and purpose of the processing, the type of personal data, and the obligations and rights of the controller.
+
+Article III. Enforcement and Penalties
+
+Section 1. Regulatory Authority
+
+(a) The Regulatory Authority shall be established as an independent public authority responsible for monitoring the application of this Regulation.
+
+(b) The Regulatory Authority shall have the power to investigate, correct, and impose sanctions for violations of this Regulation.
+
+(c) Members of the Regulatory Authority shall be appointed for a term of five years and may be reappointed once.
+
+Section 2. Investigative Powers
+
+(a) The Regulatory Authority may order data controllers and processors to provide any information it requires for the performance of its tasks.
+
+(b) The Regulatory Authority may conduct audits of data controllers and processors, including on-site inspections with reasonable notice.
+
+(c) The Regulatory Authority may obtain access to any premises of the data controller or processor where there are reasonable grounds to suspect a violation of this Regulation.
+
+Section 3. Administrative Fines
+
+(a) Violations of Article II, Section 1 shall be subject to administrative fines of up to twenty million euros (EUR 20,000,000) or, in the case of an undertaking, up to four percent (4%) of the total worldwide annual turnover, whichever is higher.
+
+(b) Violations of Article II, Section 2 shall be subject to administrative fines of up to ten million euros (EUR 10,000,000) or, in the case of an undertaking, up to two percent (2%) of the total worldwide annual turnover, whichever is higher.
+
+Section 4. Right to Judicial Remedy
+
+(a) Without prejudice to any other administrative or non-judicial remedy, every data subject shall have the right to an effective judicial remedy where they consider that their rights under this Regulation have been infringed as a result of processing of their personal data in non-compliance with this Regulation.
+
+(b) Proceedings against a data controller or processor shall be brought before the courts of the jurisdiction in which the data controller or processor has an establishment.
