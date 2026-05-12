@@ -17,16 +17,42 @@ See: .planning/PROJECT.md (updated 2026-05-12)
 
 ## Current Phase
 
-**Phase:** None (initialization complete)  
-**Status:** Ready to start Phase 1  
-**Started:** —  
+**Phase:** 1 — Core Retrieval Engine  
+**Status:** Ready to execute  
+**Started:** 2026-05-12  
 **Target Completion:** —
 
 ---
 
 ## Active Workstreams
 
-None — project initialization complete. Ready to begin Phase 1.
+**Phase 1 Planning** — Complete
+- ✓ Research (01-RESEARCH.md)
+- ✓ 4 plans created (01-01 through 01-04)
+- ○ Ready for execution
+
+---
+
+## Completed Work
+
+### 2026-05-12 — Project Initialization
+- ✓ PROJECT.md created
+- ✓ REQUIREMENTS.md created (34 v1 requirements mapped)
+- ✓ ROADMAP.md created (3 phases defined)
+- ✓ config.json created (Yolo mode, coarse granularity, parallel execution)
+
+### 2026-05-12 — Phase 1 Discussion
+- ✓ 01-CONTEXT.md created with implementation decisions
+- ✓ 01-DISCUSSION-LOG.md created with audit trail
+- ✓ 21 decisions captured across 5 areas
+
+### 2026-05-12 — Phase 1 Planning
+- ✓ 01-RESEARCH.md created (716 lines)
+- ✓ 4 PLAN.md files created:
+  - 01-01: Document Ingestion Pipeline (8 requirements)
+  - 01-02: Embedding & Indexing (5 requirements)
+  - 01-03: Hybrid Retrieval & Reranking (3 requirements)
+  - 01-04: Evaluation Framework (2 requirements)
 
 ---
 
