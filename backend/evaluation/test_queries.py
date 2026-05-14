@@ -179,6 +179,32 @@ TEST_QUERIES = [
 ]
 
 
+# QUERY_ANNOTATIONS: Optional ground-truth annotations for judge calibration
+# Maps sequential test query index to expected citation and relevance data.
+# These are optional — entries without annotations still work fine.
+QUERY_ANNOTATIONS = {
+    10: {  # "What is the maximum fine for violating data protection rights?"
+        "expected_citations": [{"article": "III", "section": "3"}],
+        "expected_relevance": 5,
+    },
+    11: {  # "What are the penalties for a data controller who fails to meet their obligations?"
+        "expected_citations": [{"article": "III", "section": "3"}],
+        "expected_relevance": 5,
+    },
+    14: {  # "What data processing activities are not allowed under this regulation?"
+        "expected_citations": [{"article": "II", "section": "1"}],
+        "expected_relevance": 4,
+    },
+    15: {  # "Can personal data be kept indefinitely under this regulation?"
+        "expected_citations": [{"article": "II", "section": "1"}],
+        "expected_relevance": 4,
+    },
+    16: {  # "What rights do data subjects have regarding their personal data?"
+        "expected_citations": [{"article": "II", "section": "1"}],
+        "expected_relevance": 5,
+    },
+}
+
 QUERY_CATEGORIES = [
     "definition",    # Queries about defined legal terms
     "scope",         # Queries about scope/application
