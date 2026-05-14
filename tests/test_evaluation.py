@@ -349,3 +349,188 @@ class TestRelevanceJudge:
             result = j.evaluate("test", "answer", [])
 
         assert result["score"] == 3
+
+
+class MockCitation:
+    """Minimal citation mock for testing citation_precision."""
+    def __init__(self, valid=True):
+        self.valid = valid
+
+
+class TestCitationPrecision:
+    """Tests for Evaluator.citation_precision()."""
+
+    def test_all_valid(self):
+        """5 valid / 5 total = 1.0"""
+        citations = [MockCitation(valid=True) for _ in range(5)]
+        assert Evaluator.citation_precision(citations) == 1.0
+
+    def test_partial_valid(self):
+        """3 valid / 5 total = 0.6"""
+        citations = [MockCitation(valid=True) for _ in range(3)] + [MockCitation(valid=False) for _ in range(2)]
+        assert Evaluator.citation_precision(citations) == 0.6
+
+    def test_none_valid(self):
+        """0 valid / 5 total = 0.0"""
+        citations = [MockCitation(valid=False) for _ in range(5)]
+        assert Evaluator.citation_precision(citations) == 0.0
+
+    def test_empty_list(self):
+        """0 / 0 = 1.0 (edge case: no citations means no incorrect ones)"""
+        assert Evaluator.citation_precision([]) == 1.0
+
+    def test_single_valid(self):
+        """1 valid / 1 total = 1.0"""
+        assert Evaluator.citation_precision([MockCitation(valid=True)]) == 1.0
+
+    def test_single_invalid(self):
+        """0 valid / 1 total = 0.0"""
+        assert Evaluator.citation_precision([MockCitation(valid=False)]) == 0.0
+
+
+class TestGenerationEvaluation:
+    """Tests for Evaluator.evaluate_generation()."""
+
+    def test_evaluate_generation_runs_with_mocked_pipeline(self):
+        """evaluate_generation runs with mocked pipeline."""
+        def mock_pipeline(query):
+            return "Generated answer for: " + query
+
+        def mock_retrieve(q, top_k=5):
+            return [{"chunk": MockChunk(1)}]
+
+        ev = Evaluator(retrieve_fn=mock_retrieve)
+        queries = [
+            {"query": "test query 1", "relevant_chunk_ids": {1}},
+        ]
+        results = ev.evaluate_generation(queries=queries)
+        assert "average_citation_precision" in results
+        assert "per_query" in results
+        assert "total_queries" in results
+        assert "evaluated_at" in results
+        assert results["total_queries"] == 1
+        assert len(results["per_query"]) == 1
+
+    def test_evaluate_generation_with_judge(self):
+        """When RelevanceJudge is provided, output includes relevance_score."""
+        j = RelevanceJudge()
+        mock_response = MagicMock()
+        mock_response.message.content = json.dumps({"score": 4, "reasoning": "Good"})
+
+        class MockGenerationPipeline:
+            def answer(self, query):
+                return ("Generated answer for: " + query, [])
+
+        def mock_retrieve(q, top_k=5):
+            return [{"chunk": MockChunk(1)}]
+
+        ev = Evaluator(retrieve_fn=mock_retrieve, generation_pipeline=MockGenerationPipeline(), judge=j)
+        queries = [
+            {"query": "test query 1", "relevant_chunk_ids": {1}},
+        ]
+        with patch("ollama.chat", return_value=mock_response):
+            results = ev.evaluate_generation(queries=queries)
+
+        per_query = results["per_query"][0]
+        assert "relevance_score" in per_query
+        assert "relevance_reasoning" in per_query
+        assert per_query["relevance_score"] == 4
+
+    def test_evaluate_generation_output_json(self):
+        """JSON output structure matches expected format."""
+        import datetime
+
+        def mock_pipeline(query):
+            return "Generated answer for: " + query
+
+        def mock_retrieve(q, top_k=5):
+            return [{"chunk": MockChunk(1)}]
+
+        ev = Evaluator(retrieve_fn=mock_retrieve)
+        queries = [
+            {"query": "q1", "relevant_chunk_ids": {1}},
+            {"query": "q2", "relevant_chunk_ids": {2}},
+        ]
+        results = ev.evaluate_generation(queries=queries)
+        assert "average_citation_precision" in results
+        assert "per_query" in results
+        assert "total_queries" in results
+        assert "judge_model" in results
+        assert "evaluated_at" in results
+        assert results["total_queries"] == 2
+        assert isinstance(results["average_citation_precision"], float)
+        assert 0.0 <= results["average_citation_precision"] <= 1.0
+        # Per-query structure
+        for pq in results["per_query"]:
+            assert "query" in pq
+            assert "citation_precision" in pq
+            assert "total_citations" in pq
+            assert "valid_citations" in pq
+
+    def test_evaluate_generation_writes_output_file(self):
+        """When output_path is specified, JSON is written to disk."""
+        import tempfile
+        import os
+        import json
+
+        def mock_pipeline(query):
+            return "Generated answer for: " + query
+
+        def mock_retrieve(q, top_k=5):
+            return [{"chunk": MockChunk(1)}]
+
+        ev = Evaluator(retrieve_fn=mock_retrieve)
+        queries = [{"query": "q1", "relevant_chunk_ids": {1}}]
+
+        with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as f:
+            output_path = f.name
+
+        try:
+            ev.evaluate_generation(queries=queries, output_path=output_path)
+            assert os.path.exists(output_path)
+            with open(output_path) as f:
+                data = json.load(f)
+            assert "average_citation_precision" in data
+            assert "per_query" in data
+        finally:
+            os.unlink(output_path)
+
+    def test_evaluate_generation_empty_queries(self):
+        """Empty query list returns empty results gracefully."""
+        def mock_pipeline(query):
+            return "answer"
+
+        def mock_retrieve(q, top_k=5):
+            return []
+
+        ev = Evaluator(retrieve_fn=mock_retrieve)
+        results = ev.evaluate_generation(queries=[])
+        assert results["total_queries"] == 0
+        assert results["per_query"] == []
+        assert results["average_citation_precision"] == 0.0
+
+    def test_evaluate_generation_defaults_to_test_queries(self):
+        """When no queries provided, defaults to TEST_QUERIES."""
+        from backend.evaluation.test_queries import TEST_QUERIES
+
+        def mock_pipeline(query):
+            return "Generated answer for: " + query
+
+        def mock_retrieve(q, top_k=5):
+            return []
+
+        ev = Evaluator(retrieve_fn=mock_retrieve)
+        results = ev.evaluate_generation()
+        assert results["total_queries"] == len(TEST_QUERIES)
+
+    def test_format_generation_results(self):
+        """format_generation_results produces readable output."""
+        results = {
+            "average_citation_precision": 0.85,
+            "total_queries": 5,
+            "evaluated_at": "2026-05-14T12:00:00",
+            "per_query": [],
+        }
+        output = Evaluator.format_generation_results(results)
+        assert "85.00%" in output or "0.85" in output
+        assert "5" in output
