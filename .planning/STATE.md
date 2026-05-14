@@ -18,9 +18,9 @@ See: .planning/PROJECT.md (updated 2026-05-12)
 ## Current Phase
 
 **Phase:** 2 — Generation & Citations  
-**Status:** CONTEXT GATHERED ✓  
+**Status:** PLANNED ✓  
 **Started:** 2026-05-12  
-**Completed:** 2026-05-12  
+**Plans Created:** 2026-05-14  
 **Target Completion:** —
 
 ---
@@ -109,9 +109,8 @@ None
 
 ## Next Actions
 
-1. `/gsd-plan-phase 2` — Create detailed plan for Generation & Citations
-2. `/gsd-execute-phase 2` — Execute the plan
-3. `/gsd-discuss-phase 3` — Gather context for Phase 3 (UI & Deployment)
+1. `/gsd-execute-phase 2` — Execute Generation & Citations plans (2 plans, 2 waves)
+2. `/gsd-discuss-phase 3` — Gather context for Phase 3 (UI & Deployment)
 
 ---
 

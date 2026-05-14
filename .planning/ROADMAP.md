@@ -11,7 +11,7 @@
 | Phase | Name | Goal | Requirements | Status |
 |-------|------|------|--------------|--------|
 | 1 | Core Retrieval Engine | Build document processing and hybrid retrieval pipeline | DOC-01~05, CHNK-01~06, RETR-01~05, EVAL-01~02 | ○ Pending |
-| 2 | Generation & Citations | Add LLM generation with legal citation support | GEN-01~05, EVAL-03~04 | ○ Pending |
+| 2 | Generation & Citations | Add LLM generation with legal citation support | GEN-01~05, EVAL-03~04 | ◆ In Progress |
 | 3 | UI & Deployment | Build Streamlit frontend and Docker deployment | API-01~05, UI-01~06 | ○ Pending |
 
 ---
@@ -68,6 +68,12 @@
 - Citation extraction via regex and LLM parsing
 - Evaluation scripts for citation accuracy
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Generation Pipeline (PromptBuilder, Generator, CitationBuilder, GenerationPipeline)
+- [ ] 02-02-PLAN.md — Evaluation Integration (citation annotations, RelevanceJudge, citation_precision, evaluate_generation)
+
 ---
 
 ## Phase 3: UI & Deployment
@@ -104,9 +110,9 @@
 - ◆ In Progress — Active phase
 - ✓ Complete — Finished and verified
 
-**Current Phase:** None (initialization complete)
+**Current Phase:** Phase 2 — Generation & Citations (planning complete, ready for execution)
 
-**Next Action:** `/gsd-discuss-phase 1`
+**Next Action:** `/gsd-execute-phase 2`
 
 ---
 
