@@ -534,3 +534,109 @@ class TestGenerationEvaluation:
         output = Evaluator.format_generation_results(results)
         assert "85.00%" in output or "0.85" in output
         assert "5" in output
+
+
+class TestEndToEndGenerationEvaluation:
+    """Integration tests for full evaluation pipeline."""
+
+    def test_evaluate_generation_with_mocked_pipeline(self):
+        """Full pipeline with mocked pipeline produces valid output structure."""
+        class MockGenerationPipeline:
+            def answer(self, query):
+                from backend.models.citation import Citation
+                citations = [
+                    Citation(text="[Article III, Section 3]", article="III", section="3", valid=True),
+                    Citation(text="[Article I, Section 1]", article="I", section="1", valid=False),
+                ]
+                return "Answer about " + query, citations
+
+        def mock_retrieve(q, top_k=5):
+            return [{"chunk": MockChunk(1)}]
+
+        ev = Evaluator(retrieve_fn=mock_retrieve, generation_pipeline=MockGenerationPipeline())
+        results = ev.evaluate_generation()
+        assert results["total_queries"] > 0
+        assert "average_citation_precision" in results
+        assert len(results["per_query"]) == results["total_queries"]
+        for pq in results["per_query"]:
+            assert "query" in pq
+            assert "citation_precision" in pq
+            assert "total_citations" in pq
+            assert "valid_citations" in pq
+
+    def test_evaluate_generation_with_judge_and_pipeline(self):
+        """Full pipeline with judge includes relevance scores."""
+        from backend.models.citation import Citation
+        j = RelevanceJudge()
+        mock_response = MagicMock()
+        mock_response.message.content = json.dumps({"score": 4, "reasoning": "Good citations"})
+
+        class MockGenerationPipeline:
+            def answer(self, query):
+                citations = [
+                    Citation(text="[Article III, Section 3]", article="III", section="3", valid=True),
+                ]
+                return "Answer about " + query, citations
+
+        def mock_retrieve(q, top_k=5):
+            return [{"chunk": MockChunk(1)}]
+
+        ev = Evaluator(
+            retrieve_fn=mock_retrieve,
+            generation_pipeline=MockGenerationPipeline(),
+            judge=j,
+        )
+        with patch("ollama.chat", return_value=mock_response):
+            results = ev.evaluate_generation()
+
+        assert results["average_relevance_score"] is not None
+        assert results["judge_model"] == "llama3.1:8b"
+        for pq in results["per_query"]:
+            assert "relevance_score" in pq
+            assert "relevance_reasoning" in pq
+
+    def test_output_json_has_required_keys(self):
+        """JSON output has all required keys for downstream consumption."""
+        class MockGenerationPipeline:
+            def answer(self, query):
+                return "Answer", []
+
+        def mock_retrieve(q, top_k=5):
+            return []
+
+        ev = Evaluator(retrieve_fn=mock_retrieve, generation_pipeline=MockGenerationPipeline())
+        results = ev.evaluate_generation()
+        required_keys = {"average_citation_precision", "per_query", "total_queries", "evaluated_at"}
+        assert required_keys.issubset(results.keys())
+
+    def test_handles_generation_pipeline_error(self):
+        """Generation pipeline error doesn't crash evaluator."""
+        class FailingPipeline:
+            def answer(self, query):
+                raise RuntimeError("Pipeline failure")
+
+        def mock_retrieve(q, top_k=5):
+            return []
+
+        ev = Evaluator(retrieve_fn=mock_retrieve, generation_pipeline=FailingPipeline())
+        results = ev.evaluate_generation()
+        assert results["total_queries"] > 0
+        assert results["average_citation_precision"] == 1.0  # no citations = 1.0
+
+    def test_output_matches_phase1_structure_pattern(self):
+        """evaluate_generation output follows Phase 1 pattern (per_query, total_queries, evaluated_at)."""
+        class MockGenerationPipeline:
+            def answer(self, query):
+                return "Answer", []
+
+        def mock_retrieve(q, top_k=5):
+            return []
+
+        ev = Evaluator(retrieve_fn=mock_retrieve, generation_pipeline=MockGenerationPipeline())
+        results = ev.evaluate_generation()
+        assert "per_query" in results
+        assert "total_queries" in results
+        assert "evaluated_at" in results
+        assert isinstance(results["per_query"], list)
+        assert isinstance(results["total_queries"], int)
+        assert isinstance(results["evaluated_at"], str)
