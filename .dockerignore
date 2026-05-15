@@ -1,0 +1,10 @@
+.git/
+.gitignore
+.planning/
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+*.md
+.DS_Store
+*.db
