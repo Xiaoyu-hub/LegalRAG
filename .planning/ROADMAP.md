@@ -98,7 +98,7 @@ Plans:
 
 Plans:
 - [x] 03-01-PLAN.md — Documents Vertical Slice (FastAPI framework, documents API, Streamlit documents page)
-- [ ] 03-02-PLAN.md — Chat + Search + Preview + Deployment (chat API, search API, chat/preview pages, Docker, README)
+- [x] 03-02-PLAN.md — Chat + Search + Preview + Deployment (chat API, search API, chat/preview pages, Docker, README)
 
 ---
 
