@@ -71,8 +71,8 @@
 **Plans:** 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Generation Pipeline (PromptBuilder, Generator, CitationBuilder, GenerationPipeline)
-- [ ] 02-02-PLAN.md — Evaluation Integration (citation annotations, RelevanceJudge, citation_precision, evaluate_generation)
+- [x] 02-01-PLAN.md — Generation Pipeline (PromptBuilder, Generator, CitationBuilder, GenerationPipeline)
+- [x] 02-02-PLAN.md — Evaluation Integration (citation annotations, RelevanceJudge, citation_precision, evaluate_generation)
 
 ---
 
@@ -94,12 +94,11 @@ Plans:
 5. Docker compose enables one-command deployment
 6. README with setup instructions and screenshots
 
-**Technical Notes:**
-- FastAPI with async endpoints for long-running tasks
-- Streamlit multi-page app structure
-- Citation box component for source display
-- Docker + docker-compose for deployment
-- Comprehensive README for GitHub
+**Plans:** 2 plans
+
+Plans:
+- [x] 03-01-PLAN.md — Documents Vertical Slice (FastAPI framework, documents API, Streamlit documents page)
+- [ ] 03-02-PLAN.md — Chat + Search + Preview + Deployment (chat API, search API, chat/preview pages, Docker, README)
 
 ---
 
@@ -110,9 +109,9 @@ Plans:
 - ◆ In Progress — Active phase
 - ✓ Complete — Finished and verified
 
-**Current Phase:** Phase 2 — Generation & Citations (planning complete, ready for execution)
+**Current Phase:** Phase 3 — UI & Deployment (Plan 01 complete)
 
-**Next Action:** `/gsd-execute-phase 2`
+**Next Action:** `/gsd-execute-phase 3 --wave 2`
 
 ---
 
