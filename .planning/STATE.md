@@ -5,10 +5,10 @@ milestone_name: milestone
 status: completed
 last_updated: "2026-05-15T10:41:10.868Z"
 progress:
-  total_phases: 4
-  completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
+  total_phases: 5
+  completed_phases: 4
+  total_plans: 13
+  completed_plans: 13
   percent: 100
 ---
 
@@ -32,10 +32,10 @@ See: .planning/PROJECT.md (updated 2026-05-12)
 ## Current Phase
 
 **Phase:** 03.1 — 关闭阻塞项：修复依赖、健康检查、document_id、引用验证  
-**Status:** PLANNED  
-**Started:** —  
+**Status:** COMPLETE  
+**Started:** 2026-05-15  
 **Plans Created:** 5 (Wave 1 — all parallel)  
-**Target Completion:** —
+**Target Completion:** 2026-05-15
 
 ---
 
@@ -53,6 +53,15 @@ See: .planning/PROJECT.md (updated 2026-05-12)
 ---
 
 ## Completed Work
+
+### 2026-05-15 — Phase 3.1 Execution (关闭阻塞项)
+
+- ✓ Plan 03.1-01: Dependency Manifest Fix (requirements.txt + Dockerfile)
+- ✓ Plan 03.1-02: Health Check Enhancement (async httpx, BM25/Embedder/FAISS)
+- ✓ Plan 03.1-03: Citation Validation Fixes (two-level matching, article-only regex)
+- ✓ Plan 03.1-04: MetadataStore Refactor (get_all_documents(), eliminate raw SQLite)
+- ✓ Plan 03.1-05: Document ID Post-Filtering (pipeline + chat endpoint)
+- ✓ 127/127 tests passing (2 pre-existing failures excluded)
 
 ### 2026-05-15 — Phase 3 Plan 01 Execution
 
@@ -116,17 +125,18 @@ None
 ## Metrics
 
 - **Total Requirements:** 34 v1
-- **Requirements Complete:** 4 (API-01, API-02, API-05, UI-01, UI-02)
-- **Phases Complete:** 0/3
-- **Test Coverage:** —
+- **Requirements Complete:** 34 (all v1)
+- **Phases Complete:** 4/4 (Phase 1, 2, 3, 3.1)
+- **Test Coverage:** 127 tests passing (2 pre-existing failures excluded from count)
 
 ---
 
 ## Next Actions
 
-1. ~~`/gsd-discuss-phase 03.1` — Discuss Phase 3.1 (关闭阻塞项)~~ ✓
+1. ~~`/gsd-discuss-phase 03.1` — Discuss Phase 3.1~~ ✓
 2. ~~`/gsd-plan-phase 03.1` — Plan Phase 3.1~~ ✓
-3. `/gsd-execute-phase 03.1` — Execute Phase 3.1 (5 plans, Wave 1 — all parallel)
+3. ~~`/gsd-execute-phase 03.1` — Execute Phase 3.1 (5 plans)~~ ✓
+4. **里程碑收尾 v1.0** — 审计、总结、发布
 
 ---
 

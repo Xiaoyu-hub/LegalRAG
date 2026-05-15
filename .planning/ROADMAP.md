@@ -13,7 +13,7 @@
 | 1 | Core Retrieval Engine | Build document processing and hybrid retrieval pipeline | DOC-01~05, CHNK-01~06, RETR-01~05, EVAL-01~02 | ✓ Complete |
 | 2 | Generation & Citations | Add LLM generation with legal citation support | GEN-01~05, EVAL-03~04 | ✓ Complete |
 | 3 | UI & Deployment | Build Streamlit frontend and Docker deployment | API-01~05, UI-01~06 | ✓ Complete |
-| 3.1 | 关闭阻塞项：修复依赖、健康检查、document_id、引用验证 | Fix blockers: deps, health check, document_id, citations | N/A | (INSERTED) |
+| 3.1 | 关闭阻塞项：修复依赖、健康检查、document_id、引用验证 | Fix blockers: deps, health check, document_id, citations | N/A | ✓ Complete |
 
 ---
 
@@ -110,9 +110,9 @@ Plans:
 - ◆ In Progress — Active phase
 - ✓ Complete — Finished and verified
 
-**Current Phase:** Phase 3.1 — 关闭阻塞项：修复依赖、健康检查、document_id、引用验证 (INSERTED)
+**Current Phase:** Phase 3.1 — 关闭阻塞项 (COMPLETE)
 
-**Next Action:** `/gsd-discuss-phase 03.1`
+**Next Action:** v1.0 里程碑收尾
 
 ---
 
@@ -138,8 +138,8 @@ Plans:
 **Plans:** 5 plans
 
 Plans:
-- [ ] 03.1-01-PLAN.md — Dependency Manifest Fix (requirements.txt + Dockerfile)
-- [ ] 03.1-02-PLAN.md — Health Check Enhancement (httpx.AsyncClient, BM25/Embedder/FAISS checks)
-- [ ] 03.1-03-PLAN.md — Citation Validation Fixes (English text, article-only regex, two-level validation)
-- [ ] 03.1-04-PLAN.md — MetadataStore Refactor (get_all_documents(), eliminate raw SQLite from documents.py)
-- [ ] 03.1-05-PLAN.md — Document ID Post-Filtering (pipeline + chat endpoint)
+- [x] 03.1-01-PLAN.md — Dependency Manifest Fix (requirements.txt + Dockerfile)
+- [x] 03.1-02-PLAN.md — Health Check Enhancement (httpx.AsyncClient, BM25/Embedder/FAISS checks)
+- [x] 03.1-03-PLAN.md — Citation Validation Fixes (English text, article-only regex, two-level validation)
+- [x] 03.1-04-PLAN.md — MetadataStore Refactor (get_all_documents(), eliminate raw SQLite from documents.py)
+- [x] 03.1-05-PLAN.md — Document ID Post-Filtering (pipeline + chat endpoint)

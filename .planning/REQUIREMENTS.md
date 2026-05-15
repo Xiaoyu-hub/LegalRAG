@@ -7,60 +7,60 @@
 
 ### Document Processing
 
-- [ ] **DOC-01**: System can upload and parse PDF legal documents
-- [ ] **DOC-02**: Parser extracts text content from PDF files
-- [ ] **DOC-03**: Structure extractor identifies Article/Section/Subsection hierarchy
-- [ ] **DOC-04**: System extracts legal term definitions from documents
-- [ ] **DOC-05**: Metadata is stored with document reference and structure info
+- [x] **DOC-01**: System can upload and parse PDF legal documents
+- [x] **DOC-02**: Parser extracts text content from PDF files
+- [x] **DOC-03**: Structure extractor identifies Article/Section/Subsection hierarchy
+- [x] **DOC-04**: System extracts legal term definitions from documents
+- [x] **DOC-05**: Metadata is stored with document reference and structure info
 
 ### Chunking & Indexing
 
-- [ ] **CHNK-01**: Legal chunker supports "by_article" strategy (Article as minimum unit)
-- [ ] **CHNK-02**: Legal chunker supports "by_section" strategy (Section as minimum unit)
-- [ ] **CHNK-03**: Chunks preserve metadata (article, section, subsection, parent references)
-- [ ] **CHNK-04**: Text is embedded using BGE-large-en-v1.5 model
-- [ ] **CHNK-05**: Embeddings are stored in FAISS index locally
-- [ ] **CHNK-06**: Document metadata stored in SQLite database
+- [x] **CHNK-01**: Legal chunker supports "by_article" strategy (Article as minimum unit)
+- [x] **CHNK-02**: Legal chunker supports "by_section" strategy (Section as minimum unit)
+- [x] **CHNK-03**: Chunks preserve metadata (article, section, subsection, parent references)
+- [x] **CHNK-04**: Text is embedded using BGE-large-en-v1.5 model
+- [x] **CHNK-05**: Embeddings are stored in FAISS index locally
+- [x] **CHNK-06**: Document metadata stored in SQLite database
 
 ### Retrieval
 
-- [ ] **RETR-01**: BM25 keyword search retrieves relevant chunks
-- [ ] **RETR-02**: Vector search retrieves semantically similar chunks
-- [ ] **RETR-03**: Hybrid search merges BM25 and vector results with configurable alpha
-- [ ] **RETR-04**: Cross-encoder reranker improves top-K result quality
-- [ ] **RETR-05**: System returns top-N chunks with metadata and similarity scores
+- [x] **RETR-01**: BM25 keyword search retrieves relevant chunks
+- [x] **RETR-02**: Vector search retrieves semantically similar chunks
+- [x] **RETR-03**: Hybrid search merges BM25 and vector results with configurable alpha
+- [x] **RETR-04**: Cross-encoder reranker improves top-K result quality
+- [x] **RETR-05**: System returns top-N chunks with metadata and similarity scores
 
 ### Generation
 
-- [ ] **GEN-01**: Prompt builder assembles context from retrieved chunks
-- [ ] **GEN-02**: System prompts LLM to cite specific Articles and Sections
-- [ ] **GEN-03**: Ollama integration supports Qwen2.5 (or Llama3) locally
-- [ ] **GEN-04**: Generated answers include formatted citations [Article X, Section Y]
-- [ ] **GEN-05**: Citation builder extracts and validates citation references
+- [x] **GEN-01**: Prompt builder assembles context from retrieved chunks
+- [x] **GEN-02**: System prompts LLM to cite specific Articles and Sections
+- [x] **GEN-03**: Ollama integration supports Qwen2.5 (or Llama3) locally
+- [x] **GEN-04**: Generated answers include formatted citations [Article X, Section Y]
+- [x] **GEN-05**: Citation builder extracts and validates citation references
 
 ### User Interface
 
-- [ ] **UI-01**: Streamlit interface provides document upload page
-- [ ] **UI-02**: Document list shows uploaded documents with metadata
-- [ ] **UI-03**: Chat interface accepts natural language questions
-- [ ] **UI-04**: Answers display with inline citations
-- [ ] **UI-05**: Citation box component shows source text and reference
-- [ ] **UI-06**: Document preview shows parsed structure
+- [x] **UI-01**: Streamlit interface provides document upload page
+- [x] **UI-02**: Document list shows uploaded documents with metadata
+- [x] **UI-03**: Chat interface accepts natural language questions
+- [x] **UI-04**: Answers display with inline citations
+- [x] **UI-05**: Citation box component shows source text and reference
+- [x] **UI-06**: Document preview shows parsed structure
 
 ### API Backend
 
-- [ ] **API-01**: FastAPI provides document upload endpoint
-- [ ] **API-02**: Document processing pipeline endpoint triggers parsing/indexing
-- [ ] **API-03**: Chat endpoint accepts question and returns answer with citations
-- [ ] **API-04**: Search endpoint returns raw retrieval results
-- [ ] **API-05**: Async processing for long-running document parsing tasks
+- [x] **API-01**: FastAPI provides document upload endpoint
+- [x] **API-02**: Document processing pipeline endpoint triggers parsing/indexing
+- [x] **API-03**: Chat endpoint accepts question and returns answer with citations
+- [x] **API-04**: Search endpoint returns raw retrieval results
+- [x] **API-05**: Async processing for long-running document parsing tasks
 
 ### Evaluation
 
-- [ ] **EVAL-01**: Precision@5 metric for retrieval quality
-- [ ] **EVAL-02**: Recall@5 metric for retrieval coverage
-- [ ] **EVAL-03**: Citation accuracy metric for answer correctness
-- [ ] **EVAL-04**: Answer relevance evaluation (LLM-as-judge)
+- [x] **EVAL-01**: Precision@5 metric for retrieval quality
+- [x] **EVAL-02**: Recall@5 metric for retrieval coverage
+- [x] **EVAL-03**: Citation accuracy metric for answer correctness
+- [x] **EVAL-04**: Answer relevance evaluation (LLM-as-judge)
 
 ## v2 Requirements
 
@@ -105,42 +105,42 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DOC-01 | Phase 1 | Pending |
-| DOC-02 | Phase 1 | Pending |
-| DOC-03 | Phase 1 | Pending |
-| DOC-04 | Phase 1 | Pending |
-| DOC-05 | Phase 1 | Pending |
-| CHNK-01 | Phase 1 | Pending |
-| CHNK-02 | Phase 1 | Pending |
-| CHNK-03 | Phase 1 | Pending |
-| CHNK-04 | Phase 1 | Pending |
-| CHNK-05 | Phase 1 | Pending |
-| CHNK-06 | Phase 1 | Pending |
-| RETR-01 | Phase 1 | Pending |
-| RETR-02 | Phase 1 | Pending |
-| RETR-03 | Phase 1 | Pending |
-| RETR-04 | Phase 1 | Pending |
-| RETR-05 | Phase 1 | Pending |
-| EVAL-01 | Phase 1 | Pending |
-| EVAL-02 | Phase 1 | Pending |
-| GEN-01 | Phase 2 | Pending |
-| GEN-02 | Phase 2 | Pending |
-| GEN-03 | Phase 2 | Pending |
-| GEN-04 | Phase 2 | Pending |
-| GEN-05 | Phase 2 | Pending |
-| EVAL-03 | Phase 2 | Pending |
-| EVAL-04 | Phase 2 | Pending |
-| API-01 | Phase 3 | Pending |
-| API-02 | Phase 3 | Pending |
-| API-03 | Phase 3 | Pending |
-| API-04 | Phase 3 | Pending |
-| API-05 | Phase 3 | Pending |
-| UI-01 | Phase 3 | Pending |
-| UI-02 | Phase 3 | Pending |
-| UI-03 | Phase 3 | Pending |
-| UI-04 | Phase 3 | Pending |
-| UI-05 | Phase 3 | Pending |
-| UI-06 | Phase 3 | Pending |
+| DOC-01 | Phase 1 | ✓ Complete |
+| DOC-02 | Phase 1 | ✓ Complete |
+| DOC-03 | Phase 1 | ✓ Complete |
+| DOC-04 | Phase 1 | ✓ Complete |
+| DOC-05 | Phase 1 | ✓ Complete |
+| CHNK-01 | Phase 1 | ✓ Complete |
+| CHNK-02 | Phase 1 | ✓ Complete |
+| CHNK-03 | Phase 1 | ✓ Complete |
+| CHNK-04 | Phase 1 | ✓ Complete |
+| CHNK-05 | Phase 1 | ✓ Complete |
+| CHNK-06 | Phase 1 | ✓ Complete |
+| RETR-01 | Phase 1 | ✓ Complete |
+| RETR-02 | Phase 1 | ✓ Complete |
+| RETR-03 | Phase 1 | ✓ Complete |
+| RETR-04 | Phase 1 | ✓ Complete |
+| RETR-05 | Phase 1 | ✓ Complete |
+| EVAL-01 | Phase 1 | ✓ Complete |
+| EVAL-02 | Phase 1 | ✓ Complete |
+| GEN-01 | Phase 2 | ✓ Complete |
+| GEN-02 | Phase 2 | ✓ Complete |
+| GEN-03 | Phase 2 | ✓ Complete |
+| GEN-04 | Phase 2 | ✓ Complete |
+| GEN-05 | Phase 2 | ✓ Complete |
+| EVAL-03 | Phase 2 | ✓ Complete |
+| EVAL-04 | Phase 2 | ✓ Complete |
+| API-01 | Phase 3 | ✓ Complete |
+| API-02 | Phase 3 | ✓ Complete |
+| API-03 | Phase 3 | ✓ Complete |
+| API-04 | Phase 3 | ✓ Complete |
+| API-05 | Phase 3 | ✓ Complete |
+| UI-01 | Phase 3 | ✓ Complete |
+| UI-02 | Phase 3 | ✓ Complete |
+| UI-03 | Phase 3 | ✓ Complete |
+| UI-04 | Phase 3 | ✓ Complete |
+| UI-05 | Phase 3 | ✓ Complete |
+| UI-06 | Phase 3 | ✓ Complete |
 
 **Coverage:**
 - v1 requirements: 34 total
@@ -149,4 +149,4 @@
 
 ---
 *Requirements defined: 2026-05-12*
-*Last updated: 2026-05-12 after initial definition*
+*Last updated: 2026-05-15 — all 34 v1 requirements completed*
