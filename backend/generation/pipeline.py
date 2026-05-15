@@ -45,3 +45,16 @@ class GenerationPipeline:
             sum(1 for c in citations if c.valid),
         )
         return cleaned_text
+
+    def answer_stream(self, query: str):
+        """Stream answer tokens, then yield source data."""
+        chunks = []
+        if self.retriever is not None and self.metadata_store is not None:
+            results = self.retriever.retrieve(query, top_k=5)
+            chunk_ids = [r[0] for r in results] if isinstance(results[0], tuple) else results
+            chunks = self.metadata_store.get_chunks(chunk_ids)
+        self.last_chunks = chunks
+
+        system_prompt, user_prompt = self.prompt_builder.build(query, chunks)
+        for token in self.generator.generate_stream(system_prompt, user_prompt):
+            yield token

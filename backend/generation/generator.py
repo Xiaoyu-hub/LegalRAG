@@ -73,6 +73,35 @@ class Generator:
             f"Neither {self.model} nor {self.fallback} is available"
         )
 
+    def generate_stream(self, system_prompt: str, user_prompt: str):
+        """Stream tokens from Ollama. Yields text tokens as they arrive."""
+        models_to_try = [self.model, self.fallback]
+        for model in models_to_try:
+            try:
+                response = chat(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    options={"temperature": 0.1, "num_ctx": 4096, "num_predict": 1024},
+                    stream=True,
+                )
+                self._last_model_used = model
+                for part in response:
+                    content = part.get("message", {}).get("content", "")
+                    if content:
+                        yield content
+                return
+            except ResponseError as e:
+                if e.status_code == 404:
+                    if model == self.fallback:
+                        raise RuntimeError(f"Neither {self.model} nor {self.fallback} available")
+                    continue
+                raise
+            except ConnectionError:
+                raise ConnectionError("Cannot connect to Ollama (ollama serve)")
+
     def ensure_model_available(self, model: str) -> bool:
         try:
             response = ollama_list()

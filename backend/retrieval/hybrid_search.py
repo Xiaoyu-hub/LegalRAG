@@ -6,9 +6,14 @@ Per D-18: Return top-10 before reranking.
 CRITICAL (Pitfall 1): BM25 and FAISS scores are on incompatible scales.
 Min-max normalize BOTH per query before weighted combination.
 """
+import logging
+
 import numpy as np
+from backend.embedding.embedder import Embedder
 from backend.retrieval.bm25 import BM25Retriever
 from backend.retrieval.vector_search import VectorSearch
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_scores(scores: np.ndarray) -> np.ndarray:
@@ -37,6 +42,17 @@ class HybridSearch:
         self.vector_search = VectorSearch.get_instance()
         self.bm25 = BM25Retriever.get_instance()
     
+    def retrieve(
+        self,
+        query: str,
+        top_k: int = 5,
+    ) -> list[tuple[int, float]]:
+        """Embed query string and run hybrid search."""
+        embedder = Embedder.get_instance()
+        query_vec = embedder.encode_query(query)
+        tokenized_query = query.lower().split()
+        return self.search(query_vec, tokenized_query, top_k=top_k)
+
     def search(
         self,
         query_vec: np.ndarray,
