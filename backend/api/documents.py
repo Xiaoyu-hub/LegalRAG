@@ -6,7 +6,6 @@ Per D-06: Unified response wrapper: {"status": "ok"|"error", "data": ..., "error
 """
 import logging
 import os
-import sqlite3
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, UploadFile
 
@@ -29,46 +28,6 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB (T-3-01)
 def _unified_response(status: str, data, error: str = None) -> dict:
     """Unified response wrapper per D-06."""
     return {"status": status, "data": data, "error": error}
-
-
-def _get_chunk_count_by_doc_id(db_path: str, doc_id: int) -> int:
-    """Count chunks for a document via direct SQLite query."""
-    conn = sqlite3.connect(db_path)
-    try:
-        c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM chunks WHERE doc_id = ?", (doc_id,))
-        row = c.fetchone()
-        return row[0] if row else 0
-    finally:
-        conn.close()
-
-
-def _get_all_documents(db_path: str) -> list[dict]:
-    """Fetch all documents via direct SQLite query.
-
-    MetadataStore does not expose get_all_documents(), so we query
-    SQLite directly per PLAN.md instructions.
-    """
-    conn = sqlite3.connect(db_path)
-    try:
-        c = conn.cursor()
-        c.execute("SELECT id, filename, title, page_count, file_path, file_size, created_at "
-                   "FROM documents ORDER BY created_at DESC")
-        rows = c.fetchall()
-        return [
-            {
-                "id": row[0],
-                "filename": row[1],
-                "title": row[2],
-                "page_count": row[3],
-                "file_path": row[4],
-                "file_size": row[5],
-                "created_at": row[6],
-            }
-            for row in rows
-        ]
-    finally:
-        conn.close()
 
 
 def _validate_filename(filename: str) -> str:
@@ -137,15 +96,11 @@ async def upload_document(
 
     # --- Dedup: skip re-indexing if this filename already exists ---
     metadata_store: MetadataStore = request.app.state.metadata_store
-    db_path = metadata_store.db_path
-    conn = sqlite3.connect(db_path)
-    try:
-        c = conn.cursor()
-        c.execute("SELECT id FROM documents WHERE filename = ?", (filename,))
-        row = c.fetchone()
-        doc_id = row[0] if row else None
-    finally:
-        conn.close()
+    doc_id = None
+    for doc in metadata_store.get_all_documents():
+        if doc.filename == filename:
+            doc_id = doc.id
+            break
 
     if doc_id is None:
         doc = Document(filename=filename, file_path=file_path, file_size=len(content))
@@ -166,12 +121,20 @@ async def upload_document(
 async def list_documents(request: Request):
     """List all uploaded documents with status and chunk count."""
     metadata_store: MetadataStore = request.app.state.metadata_store
-    db_path = metadata_store.db_path
-    documents = _get_all_documents(db_path)
-    for doc in documents:
-        doc_id = doc["id"]
-        doc["status"] = request.app.state.processing_status.get(doc_id, "unknown")
-        doc["chunk_count"] = _get_chunk_count_by_doc_id(db_path, doc_id)
+    documents = []
+    for doc in metadata_store.get_all_documents():
+        doc_dict = {
+            "id": doc.id,
+            "filename": doc.filename,
+            "title": doc.title,
+            "page_count": doc.page_count,
+            "file_path": doc.file_path,
+            "file_size": doc.file_size,
+            "created_at": str(doc.created_at) if doc.created_at else "",
+            "status": request.app.state.processing_status.get(doc.id, "unknown"),
+            "chunk_count": len(metadata_store.get_chunks_by_doc_id(doc.id)),
+        }
+        documents.append(doc_dict)
     return _unified_response("ok", {"documents": documents}, None)
 
 
@@ -190,7 +153,7 @@ async def get_document(doc_id: int, request: Request):
         "file_size": doc.file_size,
         "created_at": str(doc.created_at),
         "status": request.app.state.processing_status.get(doc_id, "unknown"),
-        "chunk_count": _get_chunk_count_by_doc_id(metadata_store.db_path, doc_id),
+        "chunk_count": len(metadata_store.get_chunks_by_doc_id(doc_id)),
     }, None)
 
 
@@ -205,7 +168,7 @@ async def get_document_status(doc_id: int, request: Request):
     return _unified_response("ok", {
         "document_id": doc_id,
         "processing_status": status,
-        "chunk_count": _get_chunk_count_by_doc_id(metadata_store.db_path, doc_id) if status == "ready" else 0,
+        "chunk_count": len(metadata_store.get_chunks_by_doc_id(doc_id)) if status == "ready" else 0,
     }, None)
 
 

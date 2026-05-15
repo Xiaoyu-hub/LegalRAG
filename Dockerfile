@@ -23,7 +23,6 @@ CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 # Frontend stage
 FROM base as frontend
-RUN pip install --no-cache-dir streamlit
 COPY app/ ./app/
 COPY backend/ ./backend/
 COPY configs/ ./configs/

@@ -14,7 +14,7 @@ import logging
 import os
 import sqlite3
 
-import requests
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -149,7 +149,7 @@ app.include_router(search_router, prefix="/api/v1")
 
 @app.get("/api/v1/health")
 async def health(request: Request):
-    """Check system health: Ollama, SQLite, FAISS."""
+    """Check system health: Ollama, SQLite, FAISS, BM25, Embedder."""
     # --- SQLite ---
     try:
         conn = sqlite3.connect(request.app.state.metadata_store.db_path)
@@ -159,16 +159,37 @@ async def health(request: Request):
     except Exception:
         sqlite_status = "error"
 
-    # --- FAISS index file ---
+    # --- FAISS index ---
+    from backend.retrieval.vector_search import VectorSearch
     faiss_path = "data/index/vector.faiss"
-    faiss_status = "ok" if os.path.exists(faiss_path) else "error"
+    faiss_has_file = os.path.exists(faiss_path)
+    faiss_has_vectors = VectorSearch.get_instance().size > 0
+    faiss_status = "ok" if faiss_has_file and faiss_has_vectors else "error"
 
     # --- Ollama ---
     try:
-        resp = requests.get("http://localhost:11434/api/tags", timeout=2)
-        ollama_status = "ok" if resp.status_code == 200 else "error"
+        async with httpx.AsyncClient(timeout=httpx.Timeout(2.0)) as client:
+            resp = await client.get("http://localhost:11434/api/tags")
+            ollama_status = "ok" if resp.status_code == 200 else "error"
     except Exception:
         ollama_status = "error"
+
+    # --- BM25 ---
+    from backend.retrieval.bm25 import BM25Retriever
+    try:
+        bm25 = BM25Retriever.get_instance()
+        bm25_status = "ok" if bm25.bm25 is not None and len(bm25.corpus) > 0 else "error"
+    except Exception:
+        bm25_status = "error"
+
+    # --- Embedder ---
+    from backend.embedding.embedder import Embedder
+    try:
+        embedder = Embedder.get_instance()
+        embedder.model.encode(["health check"], batch_size=1)
+        embedder_status = "ok"
+    except Exception:
+        embedder_status = "error"
 
     return {
         "status": "ok",
@@ -176,6 +197,8 @@ async def health(request: Request):
             "ollama": ollama_status,
             "sqlite": sqlite_status,
             "faiss": faiss_status,
+            "bm25": bm25_status,
+            "embedder": embedder_status,
         },
         "error": None,
     }

@@ -235,7 +235,7 @@ class TestCitationBuilder:
         ]
         text = "The fine is [Article X, Section 99]."
         result = builder.mark_invalid(text, citations)
-        assert "[引用待核实]" in result
+        assert "[Citation needs verification]" in result
         assert "[Article X, Section 99]" not in result
 
     def test_mark_invalid_skips_valid(self, builder):
@@ -250,7 +250,7 @@ class TestCitationBuilder:
         text = "The right is [Article I, Section 1]."
         result = builder.mark_invalid(text, citations)
         assert "[Article I, Section 1]" in result
-        assert "[引用待核实]" not in result
+        assert "[Citation needs verification]" not in result
 
     def test_process_full_pipeline(self, builder):
         chunks = [Chunk(id=1, text="content", article="I", section="1")]
@@ -261,7 +261,7 @@ class TestCitationBuilder:
         cleaned, citations = builder.process(text, chunks)
         assert "[Article I, Section 1]" in cleaned
         assert "[Article X, Section 99]" not in cleaned
-        assert "[引用待核实]" in cleaned
+        assert "[Citation needs verification]" in cleaned
         assert len(citations) == 2
         assert citations[0].valid is True
         assert citations[1].valid is False

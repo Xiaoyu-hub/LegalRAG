@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-last_updated: "2026-05-15T07:08:03.973Z"
+last_updated: "2026-05-15T10:41:10.868Z"
 progress:
-  total_phases: 3
+  total_phases: 4
   completed_phases: 3
   total_plans: 8
   completed_plans: 8
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-05-12)
 
 ## Current Phase
 
-**Phase:** 03 — UI & Deployment  
-**Status:** EXECUTING  
-**Started:** 2026-05-15  
-**Plans Created:** 2026-05-14  
+**Phase:** 03.1 — 关闭阻塞项：修复依赖、健康检查、document_id、引用验证  
+**Status:** PLANNED  
+**Started:** —  
+**Plans Created:** 5 (Wave 1 — all parallel)  
 **Target Completion:** —
 
 ---
@@ -124,8 +124,16 @@ None
 
 ## Next Actions
 
-1. `/gsd-execute-phase 3 --wave 2` — Execute Phase 3 Plan 2 (Chat, Search, Preview, Docker)
+1. ~~`/gsd-discuss-phase 03.1` — Discuss Phase 3.1 (关闭阻塞项)~~ ✓
+2. ~~`/gsd-plan-phase 03.1` — Plan Phase 3.1~~ ✓
+3. `/gsd-execute-phase 03.1` — Execute Phase 3.1 (5 plans, Wave 1 — all parallel)
 
 ---
 
 *State tracking active*
+
+## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 03.1 inserted after Phase 3: 关闭阻塞项：修复依赖、健康检查、document_id、引用验证 (URGENT)

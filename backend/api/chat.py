@@ -33,7 +33,7 @@ async def chat(req: ChatRequest, request: Request):
 
     async def stream_answer():
         full_text = ""
-        for token in pipeline.answer_stream(req.question):
+        for token in pipeline.answer_stream(req.question, document_id=req.document_id):
             full_text += token
             yield token
 

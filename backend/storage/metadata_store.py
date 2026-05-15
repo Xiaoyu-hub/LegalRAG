@@ -111,6 +111,29 @@ class MetadataStore:
             )
         return None
 
+    def get_all_documents(self) -> list[Document]:
+        """Retrieve all documents ordered by created_at DESC.
+        
+        Per D-11: Encapsulate document listing in MetadataStore
+        instead of exposing raw SQLite to API layer.
+        """
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute(
+            "SELECT id, filename, title, page_count, file_path, file_size, created_at "
+            "FROM documents ORDER BY created_at DESC"
+        )
+        rows = c.fetchall()
+        conn.close()
+        return [
+            Document(
+                id=r[0], filename=r[1], title=r[2],
+                page_count=r[3], file_path=r[4], file_size=r[5],
+                created_at=r[6],
+            )
+            for r in rows
+        ]
+
     def get_chunks(self, chunk_ids: list[int]) -> list[Chunk]:
         if not chunk_ids:
             return []

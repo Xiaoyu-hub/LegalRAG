@@ -23,7 +23,7 @@ class GenerationPipeline:
         self.citation_builder = CitationBuilder()
         self.last_chunks = []
 
-    def answer(self, query: str) -> str:
+    def answer(self, query: str, document_id: int | None = None) -> str:
         chunks = []
 
         if self.retriever is not None and self.metadata_store is not None:
@@ -31,6 +31,9 @@ class GenerationPipeline:
             if results:
                 chunk_ids = [r[0] for r in results] if isinstance(results[0], tuple) else results
                 chunks = self.metadata_store.get_chunks(chunk_ids)
+                # Post-filter by document_id (D-10)
+                if document_id is not None:
+                    chunks = [c for c in chunks if c.doc_id == document_id]
 
         self.last_chunks = chunks
 
@@ -47,7 +50,7 @@ class GenerationPipeline:
         )
         return cleaned_text
 
-    def answer_stream(self, query: str):
+    def answer_stream(self, query: str, document_id: int | None = None):
         """Stream answer tokens, then yield source data."""
         chunks = []
         if self.retriever is not None and self.metadata_store is not None:
@@ -55,6 +58,9 @@ class GenerationPipeline:
             if results:
                 chunk_ids = [r[0] for r in results] if isinstance(results[0], tuple) else results
                 chunks = self.metadata_store.get_chunks(chunk_ids)
+                # Post-filter by document_id (D-10)
+                if document_id is not None:
+                    chunks = [c for c in chunks if c.doc_id == document_id]
         self.last_chunks = chunks
 
         system_prompt, user_prompt = self.prompt_builder.build(query, chunks)
