@@ -10,9 +10,9 @@
 
 | Phase | Name | Goal | Requirements | Status |
 |-------|------|------|--------------|--------|
-| 1 | Core Retrieval Engine | Build document processing and hybrid retrieval pipeline | DOC-01~05, CHNK-01~06, RETR-01~05, EVAL-01~02 | ○ Pending |
-| 2 | Generation & Citations | Add LLM generation with legal citation support | GEN-01~05, EVAL-03~04 | ◆ In Progress |
-| 3 | UI & Deployment | Build Streamlit frontend and Docker deployment | API-01~05, UI-01~06 | ○ Pending |
+| 1 | Core Retrieval Engine | Build document processing and hybrid retrieval pipeline | DOC-01~05, CHNK-01~06, RETR-01~05, EVAL-01~02 | ✓ Complete |
+| 2 | Generation & Citations | Add LLM generation with legal citation support | GEN-01~05, EVAL-03~04 | ✓ Complete |
+| 3 | UI & Deployment | Build Streamlit frontend and Docker deployment | API-01~05, UI-01~06 | ✓ Complete |
 
 ---
 
@@ -109,9 +109,9 @@ Plans:
 - ◆ In Progress — Active phase
 - ✓ Complete — Finished and verified
 
-**Current Phase:** Phase 3 — UI & Deployment (Plan 01 complete)
+**Current Phase:** Phase 3 — UI & Deployment (Complete)
 
-**Next Action:** `/gsd-execute-phase 3 --wave 2`
+**Next Action:** `/gsd-complete-milestone v1.0`
 
 ---
 
