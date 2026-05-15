@@ -129,7 +129,7 @@ with st.sidebar:
             doc_options = {f"{d['filename']} (ID: {d['id']})": d["id"] for d in docs}
             if doc_options:
                 selected = st.selectbox(
-                    "", list(doc_options.keys()), label_visibility="collapsed"
+                    "Select document", list(doc_options.keys()), label_visibility="collapsed"
                 )
                 st.session_state.selected_doc_id = doc_options[selected]
                 st.session_state.selected_doc_name = selected.split(" (ID:")[0]

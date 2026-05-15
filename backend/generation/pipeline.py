@@ -13,7 +13,7 @@ class GenerationPipeline:
         self,
         retriever=None,
         metadata_store=None,
-        model: str = "llama3.1:8b",
+        model: str = "llama3.2:3b",
         fallback: str = "qwen2.5:7b",
     ):
         self.retriever = retriever

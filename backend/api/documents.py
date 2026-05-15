@@ -90,7 +90,7 @@ def process_document_task(doc_id: int, file_path: str, app_state):
     logger.info("Starting background processing for doc_id=%d, file_path=%s", doc_id, file_path)
     try:
         indexer: Indexer = app_state.indexer
-        indexer.process_document(file_path)
+        indexer.process_document(file_path, doc_id=doc_id)
         app_state.processing_status[doc_id] = "ready"
         logger.info("Document %d processed successfully", doc_id)
     except Exception as exc:

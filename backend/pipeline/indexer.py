@@ -30,8 +30,13 @@ class Indexer:
         self.bm25 = BM25Retriever.get_instance()
         self.metadata_store = MetadataStore(db_path=db_path)
 
-    def process_document(self, file_path: str) -> int:
+    def process_document(self, file_path: str, doc_id: int | None = None) -> int:
         """Process a single PDF document through the full pipeline.
+
+        Args:
+            file_path: Path to the PDF file.
+            doc_id: Existing document ID (created by API layer). If None,
+                     a new document record is created.
 
         Returns: doc_id from metadata store.
         """
@@ -45,14 +50,15 @@ class Indexer:
         # 3. Chunk
         chunks = self.chunker.chunk(structure, raw_text)
 
-        # 4. Create document record
-        filename = os.path.basename(file_path)
-        doc = Document(
-            filename=filename,
-            file_path=file_path,
-            file_size=os.path.getsize(file_path),
-        )
-        doc_id = self.metadata_store.insert_document(doc)
+        # 4. Create or reuse document record
+        if doc_id is None:
+            filename = os.path.basename(file_path)
+            doc = Document(
+                filename=filename,
+                file_path=file_path,
+                file_size=os.path.getsize(file_path),
+            )
+            doc_id = self.metadata_store.insert_document(doc)
 
         # 5. Store chunks in SQLite
         self.metadata_store.insert_chunks(doc_id, chunks)

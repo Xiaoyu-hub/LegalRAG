@@ -82,11 +82,48 @@ async def startup():
     app.state.indexer = Indexer()
 
     # Pre-initialise retrieval singletons so their first use is fast
-    VectorSearch.get_instance()
-    BM25Retriever.get_instance()
+    vs = VectorSearch.get_instance()
+    bm = BM25Retriever.get_instance()
+
+    # Restore FAISS index from disk if it exists
+    faiss_path = "data/index/vector.faiss"
+    if os.path.exists(faiss_path):
+        try:
+            vs.load(faiss_path)
+            logger.info("Loaded FAISS index from %s (%d vectors)", faiss_path, vs.size)
+        except Exception as exc:
+            logger.warning("Could not load FAISS index: %s", exc)
+
+    # Rebuild BM25 index from existing chunks in the database
+    try:
+        all_chunks = app.state.metadata_store.get_all_chunks()
+        if all_chunks:
+            texts = [c.text for c in all_chunks]
+            ids = [c.id for c in all_chunks]
+            bm.build_index(texts, ids)
+            logger.info("Rebuilt BM25 index with %d chunks", len(texts))
+    except Exception as exc:
+        logger.warning("Could not rebuild BM25 index: %s", exc)
 
     # Per-document async processing status (D-05)
     app.state.processing_status = {}
+    # Mark documents that already have chunks as "ready"
+    try:
+        import sqlite3 as _sqlite3
+        conn = _sqlite3.connect(app.state.metadata_store.db_path)
+        c = conn.cursor()
+        c.execute("SELECT id FROM documents")
+        doc_ids = [row[0] for row in c.fetchall()]
+        conn.close()
+        for doc_id in doc_ids:
+            chunks = app.state.metadata_store.get_chunks_by_doc_id(doc_id)
+            if chunks:
+                app.state.processing_status[doc_id] = "ready"
+        if doc_ids:
+            ready_count = sum(1 for d in doc_ids if d in app.state.processing_status)
+            logger.info("Restored processing status: %d/%d documents ready", ready_count, len(doc_ids))
+    except Exception as exc:
+        logger.warning("Could not restore document statuses: %s", exc)
 
     # Citation retrieval buffer for Plan 2 (chat endpoint)
     app.state.last_chat_sources = []

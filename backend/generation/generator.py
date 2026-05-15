@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 class Generator:
 
-    def __init__(self, model: str = "llama3.1:8b", fallback: str = "qwen2.5:7b"):
+    def __init__(self, model: str = "llama3.2:3b", fallback: str = "llama3.1:8b"):
         self.model = model
         self.fallback = fallback
         self._last_model_used = None
