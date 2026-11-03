@@ -109,8 +109,10 @@ def make_pdfs():
 
 def start_server(tag):
     log = open(os.path.join(WORK, f"server_{tag}.log"), "w", encoding="utf-8")
+    # 用当前解释器：Windows 是 .venv/Scripts/python.exe，Linux CI 是 .venv/bin/python，
+    # 写死路径会在 CI 上报 FileNotFoundError
     p = subprocess.Popen(
-        [os.path.join(REPO, ".venv", "Scripts", "python.exe"), "-m", "uvicorn",
+        [sys.executable, "-m", "uvicorn",
          "backend.main:app", "--host", "127.0.0.1", "--port", str(PORT)],
         cwd=REPO, env=ENV, stdout=log, stderr=subprocess.STDOUT,
     )
