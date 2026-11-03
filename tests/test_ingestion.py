@@ -232,3 +232,57 @@ class TestIntegrationPipeline:
         chunk_texts = store.get_chunk_texts()
         assert any("General Provisions" in t for t in chunk_texts), \
             "Chunks should contain 'General Provisions'"
+
+
+# ── 分块覆盖率回归（2026-11-03 修 Article 边界不 flush 的缺陷）──────────────────
+
+class TestChunkCoverage:
+    """保证「每一个结构元素都被至少一个 chunk 覆盖」。
+
+    旧缺陷：`_chunk_by_section` 遇到新的 article 时直接把 current_section_data
+    置 None，不 flush 上一个待写的 section，导致每个 Article 的最后一个小节
+    （含其全部子条款）被静默丢弃。实测 sample_legal.txt 丢 17.4% 正文字符。
+    """
+
+    @staticmethod
+    def _structure():
+        from pathlib import Path
+        from backend.pipeline.structure_extractor import StructureExtractor
+        text = (Path(__file__).parent.parent / "data" / "test" / "sample_legal.txt").read_text(
+            encoding="utf-8"
+        )
+        return StructureExtractor().extract(text), text
+
+    def test_every_element_is_covered_by_section_chunks(self):
+        import re
+        from backend.pipeline.legal_chunker import LegalChunker
+
+        structure, text = self._structure()
+        chunks = LegalChunker(strategy="by_section").chunk(structure, text)
+
+        missing = [e for e in structure
+                   if e["text"].strip()
+                   and not any(e["text"].strip() in c.text for c in chunks)]
+        assert missing == [], f"以下结构元素没有进入任何 chunk：{[e['text'][:40] for e in missing]}"
+
+    def test_section_count_matches_structure(self):
+        from backend.pipeline.legal_chunker import LegalChunker
+
+        structure, text = self._structure()
+        n_sections = sum(1 for e in structure if e["type"] == "section")
+        chunks = LegalChunker(strategy="by_section").chunk(structure, text)
+        assert len(chunks) == n_sections, (
+            f"by_section 应每个 Section 一个 chunk：结构 {n_sections} 个 / chunk {len(chunks)} 个"
+        )
+
+    def test_last_section_of_each_article_present(self):
+        from backend.pipeline.legal_chunker import LegalChunker
+
+        structure, text = self._structure()
+        chunks = LegalChunker(strategy="by_section").chunk(structure, text)
+        joined = "\n".join(c.text for c in chunks)
+        # 这两节历史上就是被丢掉的 Article I / II 末节
+        assert "Section 3. Interpretation" in joined
+        assert "Section 3. Data Processing Agreements" in joined
+        # 父级 Article 标题要带回 chunk 作上下文
+        assert "Article I. General Provisions" in joined

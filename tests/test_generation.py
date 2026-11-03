@@ -296,7 +296,10 @@ class TestGenerator:
         )
         result = generator.generate("system", "user")
         assert result == "Fallback answer."
-        assert generator.last_model_used == "qwen2.5:7b"
+        # 主备模型的默认值以 generator 模块常量为唯一来源（旧版本测试写死 qwen2.5:7b，
+        # 与实现/README 的 llama3.1:8b 不同步）
+        from backend.generation.generator import DEFAULT_FALLBACK_MODEL
+        assert generator.last_model_used == DEFAULT_FALLBACK_MODEL
 
     def test_generate_raises_connection_error(self, mocker, generator):
         mocker.patch(

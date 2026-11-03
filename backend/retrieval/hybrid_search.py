@@ -45,12 +45,16 @@ class HybridSearch:
     def retrieve(
         self,
         query: str,
-        top_k: int = 5,
+        top_k: int | None = None,
     ) -> list[tuple[int, float]]:
-        """Embed query string and run hybrid search."""
+        """Embed query string and run hybrid search.
+
+        top_k 默认用 self.top_k（10，D-18 的重排池），不要写死 5：
+        否则重排只能在 5 条里换顺序，无法把 6~10 名的候选提上来。
+        """
         embedder = Embedder.get_instance()
         query_vec = embedder.encode_query(query)
-        tokenized_query = query.lower().split()
+        tokenized_query = BM25Retriever.tokenize(query)
         return self.search(query_vec, tokenized_query, top_k=top_k)
 
     def search(
@@ -90,6 +94,13 @@ class HybridSearch:
         bm25_norm = normalize_scores(bm25_scores)
         
         hybrid = alpha * vec_norm + (1.0 - alpha) * bm25_norm
-        
+
         top_indices = np.argsort(hybrid)[::-1][:k]
-        return [(int(idx), float(hybrid[idx])) for idx in top_indices]
+        # FAISS 返回的是索引内部位置（0..N-1），业务 id 存在 chunk_ids 里；
+        # 上游（pipeline / api/search）拿返回值去查 SQLite 主键，所以这里必须
+        # 转成真实 chunk_id，否则每条命中都偏一条，top-1 直接消失。
+        mapped = self.vector_search.chunk_ids
+        return [
+            (int(mapped[idx]) if idx < len(mapped) else int(idx), float(hybrid[idx]))
+            for idx in top_indices
+        ]

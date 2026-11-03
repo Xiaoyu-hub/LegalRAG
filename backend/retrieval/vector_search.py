@@ -17,6 +17,7 @@ class VectorSearch:
         self.dimension = dimension
         self._init_index()
         self.chunk_ids = []  # Maps FAISS index position -> chunk_id
+        self.mapping_trusted = False
 
     def _init_index(self):
         import faiss
@@ -50,6 +51,7 @@ class VectorSearch:
             self.chunk_ids.extend(chunk_ids)
         else:
             self.chunk_ids.extend(range(start_idx, start_idx + embeddings.shape[0]))
+        self.mapping_trusted = len(self.chunk_ids) == self.index.ntotal
 
     def search(self, query_vec: np.ndarray, k: int = 10) -> tuple[np.ndarray, np.ndarray]:
         """Search index for nearest neighbors.
@@ -76,31 +78,77 @@ class VectorSearch:
         return [self.chunk_ids[i] if i != -1 else -1 for i in indices[0]]
 
     def save(self, path: str):
-        """Save FAISS index to file."""
+        """Save FAISS index to file, plus the position→chunk_id mapping.
+
+        只存向量是不够的：FAISS 内部只有位置（0..N-1），而 SQLite 主键从 1 开始，
+        两者不是一个 id 空间。映射必须与索引一起落盘，否则重启后只能回退成
+        range(ntotal)，同一份索引会两种语义（重启前后），造成“每条命中偏一条”。
+        两个文件都走 tmp + os.replace 的原子写法。
+        """
         import faiss
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        # Write to temp file then rename for atomicity (Pitfall 6)
         tmp_path = path + ".tmp"
         faiss.write_index(self.index, tmp_path)
         os.replace(tmp_path, path)
 
+        ids_path = self._ids_path(path)
+        tmp_ids = ids_path + ".tmp"
+        np.save(tmp_ids, np.asarray(self.chunk_ids, dtype=np.int64))
+        os.replace(tmp_ids + ".npy", ids_path)
+
+    @staticmethod
+    def _ids_path(path: str) -> str:
+        """映射文件路径：与索引同目录，便于一起备份/回滚。"""
+        return path + ".ids.npy"
+
     def load(self, path: str, chunk_ids: list[int] | None = None):
-        """Load FAISS index from file."""
+        """Load FAISS index from file.
+
+        优先用显式传入的 chunk_ids；其次读旁边的 .ids.npy；都没有才回退
+        range(ntotal)，并把 mapping_trusted 置 False，让调用方自行决定重建。
+        """
         import faiss
         if not os.path.exists(path):
             raise FileNotFoundError(f"Index file not found: {path}")
         self.index = faiss.read_index(path)
         self.dimension = self.index.d
+        self.mapping_trusted = False
+
         if chunk_ids:
-            self.chunk_ids = chunk_ids
-        else:
-            self.chunk_ids = list(range(self.index.ntotal))
+            self.chunk_ids = list(chunk_ids)
+            self.mapping_trusted = len(self.chunk_ids) == self.index.ntotal
+            return
+
+        ids_path = self._ids_path(path)
+        if os.path.exists(ids_path):
+            loaded = np.load(ids_path).tolist()
+            if len(loaded) == self.index.ntotal:
+                self.chunk_ids = loaded
+                self.mapping_trusted = True
+                return
+
+        # 映射文件缺失或长度不符：不猜，交给调用方按数据库重建
+        self.chunk_ids = list(range(self.index.ntotal))
+
+    def mapping_matches(self, expected_ids: list[int]) -> bool:
+        """校验映射与数据库 id 集合是否一致（集合比较，不管顺序）。
+
+        不一致的典型成因：删过文档、重传同名文件、索引文件与 .ids.npy 不同步。
+        """
+        return sorted(self.chunk_ids) == sorted(expected_ids)
 
     @property
     def size(self) -> int:
         return self.index.ntotal
 
-    def reset(self):
-        """Clear the index."""
+    def reset(self, dimension: int | None = None):
+        """Clear the index.
+
+        dimension 给出时顺便重建索引维度（单例被不同维度的用例共享时必需，
+        否则 faiss 会在 add 时报 d != self.d）。
+        """
+        if dimension is not None:
+            self.dimension = dimension
         self._init_index()
         self.chunk_ids = []
+        self.mapping_trusted = False

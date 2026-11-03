@@ -40,16 +40,22 @@ def _validate_filename(filename: str) -> str:
 # ── Background Task ────────────────────────────────────────────────────────
 
 
-def process_document_task(doc_id: int, file_path: str, app_state):
+def process_document_task(doc_id: int, file_path: str, app_state, rebuild: bool = False):
     """Run full indexing pipeline as a background task.
 
     On success: marks status as "ready".
     On failure: marks status as "error" and logs the traceback.
+
+    rebuild=True 时在索引完后从数据库全量重建 FAISS + BM25：替换/删除文档后，
+    旧 chunk 的向量还留在索引里，不清掉会检索到已删除的条文。
     """
     logger.info("Starting background processing for doc_id=%d, file_path=%s", doc_id, file_path)
     try:
         indexer: Indexer = app_state.indexer
         indexer.process_document(file_path, doc_id=doc_id)
+        if rebuild:
+            n = indexer.rebuild_all()
+            logger.info("Rebuilt indexes after replacement: %d chunks", n)
         app_state.processing_status[doc_id] = "ready"
         logger.info("Document %d processed successfully", doc_id)
     except Exception as exc:
@@ -94,26 +100,31 @@ async def upload_document(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    # --- Dedup: skip re-indexing if this filename already exists ---
+    # --- Dedup: 同名视为「替换」，先删旧记录（CASCADE 清 chunks）再当新文档 ---
     metadata_store: MetadataStore = request.app.state.metadata_store
-    doc_id = None
-    for doc in metadata_store.get_all_documents():
-        if doc.filename == filename:
-            doc_id = doc.id
-            break
+    existing = metadata_store.get_document_by_filename(filename)
+    replaced = False
+    if existing is not None:
+        # 文件已在上面覆盖写入，旧路径就是同一个 path
+        metadata_store.delete_document(existing.id)
+        request.app.state.processing_status.pop(existing.id, None)
+        replaced = True
+        logger.info("Replaced existing document %d (%s)", existing.id, filename)
 
-    if doc_id is None:
-        doc = Document(filename=filename, file_path=file_path, file_size=len(content))
-        doc_id = metadata_store.insert_document(doc)
+    doc = Document(filename=filename, file_path=file_path, file_size=len(content))
+    doc_id = metadata_store.insert_document(doc)
 
     # --- Launch background indexing ---
     request.app.state.processing_status[doc_id] = "processing"
-    background_tasks.add_task(process_document_task, doc_id, file_path, request.app.state)
+    background_tasks.add_task(
+        process_document_task, doc_id, file_path, request.app.state, replaced
+    )
 
     return _unified_response("ok", {
         "document_id": doc_id,
         "filename": filename,
         "status": "processing",
+        "replaced": replaced,
     }, None)
 
 

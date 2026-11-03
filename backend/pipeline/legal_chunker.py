@@ -37,6 +37,14 @@ class LegalChunker:
 
         for element in structure:
             if element["type"] == "article":
+                # 进入新 Article 前必须先把上一个 Article 里最后一个 Section
+                # flush 掉，否则每个 Article 的末小节会被静默丢弃
+                # （实测 sample_legal.txt：10 个 Section 只落 8 个 chunk，17.4% 正文丢失）
+                if current_section_data:
+                    chunks.append(self._make_chunk(
+                        current_section_data, section_texts, chunk_index
+                    ))
+                    chunk_index += 1
                 current_article_text = element["text"]
                 current_section_data = None
                 section_texts = []

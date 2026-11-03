@@ -4,8 +4,10 @@ faiss-cpu==1.13.2
 httpx==0.28.1
 jinja2>=3.1
 numpy>=1.26.4
+ollama==0.6.3
 pdfplumber==0.11.9
 pymupdf==1.27.2.3
+python-multipart==0.0.20
 pyyaml>=6.0
 rank-bm25==0.2.2
 requests==2.32.3
@@ -16,3 +18,4 @@ uvicorn[standard]==0.34.0
 
 # ── Development Dependencies ─────────────────────────────────
 pytest>=8.0
+pytest-mock>=3.14

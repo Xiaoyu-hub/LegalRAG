@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# 运行时产物
+data/documents/
+logs/
+*.log
+
+# 本地模型缓存
+.cache/

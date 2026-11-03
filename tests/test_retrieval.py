@@ -234,33 +234,40 @@ class TestReranker:
 
 
 class TestFullRetrievalPipeline:
-    def test_retrieve_end_to_end(self):
-        """Full pipeline: embed query → vector search + BM25 → hybrid → rerank → attach metadata."""
+    def test_retrieve_end_to_end(self, tmp_path):
+        """Full pipeline: embed query → vector search + BM25 → hybrid → rerank → attach metadata.
+
+        用临时库，不往仓库里的 data/metadata.db 写脏数据（旧版就是用默认库，
+        还会调不存在的 insert_chunk 导致整条用例红）。
+        """
         from backend.retrieval.hybrid_search import HybridSearch
         from backend.retrieval.reranker import Reranker
         from backend.retrieval.vector_search import VectorSearch
         from backend.retrieval.bm25 import BM25Retriever
         from backend.embedding.embedder import Embedder
         from backend.storage.metadata_store import MetadataStore, Chunk
-        
+
         vec_search = VectorSearch.get_instance()
         bm25 = BM25Retriever.get_instance()
-        store = MetadataStore()
-        
+        store = MetadataStore(db_path=str(tmp_path / "e2e.db"))
+
         vec_search.reset()
-        
-        chunks = [
-            Chunk(id=1, doc_id=1, chunk_index=0, text="Section 1. Definitions. Person means individual.",
+
+        from backend.models.document import Document
+        # 外键约束现在真的生效（PRAGMA foreign_keys=ON），先建文档再插 chunk
+        doc_id = store.insert_document(Document(filename="e2e.txt"))
+
+        store.insert_chunks(doc_id, [
+            Chunk(doc_id=doc_id, chunk_index=0, text="Section 1. Definitions. Person means individual.",
                   article="Article I", section="Section 1", subsection=None,
                   title="Definitions", parent_article="Article I. General Provisions", strategy="by_section"),
-            Chunk(id=2, doc_id=1, chunk_index=1, text="Section 2. Scope. This applies to all entities.",
+            Chunk(doc_id=doc_id, chunk_index=1, text="Section 2. Scope. This applies to all entities.",
                   article="Article I", section="Section 2", subsection=None,
                   title="Scope", parent_article="Article I. General Provisions", strategy="by_section"),
-        ]
-        
-        for chunk in chunks:
-            store.insert_chunk(chunk)
-        
+        ])
+
+        chunks = store.get_chunks_by_doc_id(doc_id)
+
         embedder = Embedder.get_instance()
         texts = [c.text for c in chunks]
         embeddings = embedder.encode(texts)

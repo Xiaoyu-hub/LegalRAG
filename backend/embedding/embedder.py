@@ -12,25 +12,35 @@ from sentence_transformers import SentenceTransformer
 QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
 
 DEFAULT_MODEL = "BAAI/bge-large-en-v1.5"
-# Fallback local cache path used when hub download fails (SSL issues)
-_LOCAL_CACHE = os.path.join(
-    os.path.expanduser("~"),
-    ".cache/huggingface/hub/models--BAAI--bge-large-en-v1.5/snapshots",
-)
-_FALLBACK = None
-if os.path.isdir(_LOCAL_CACHE):
-    entries = sorted(os.listdir(_LOCAL_CACHE))
-    if entries:
-        _FALLBACK = os.path.join(_LOCAL_CACHE, entries[-1])
+
+
+def _fallback_snapshot() -> str | None:
+    """在模块导入时也能拿到——但缓存可能在导入之后才建好，所以每次调用时现查。
+
+    现代 HF 缓存布局是 snapshots/<commit-sha>/；不能写死 snapshots/main。
+    """
+    cache_root = os.path.join(
+        os.path.expanduser("~"),
+        ".cache/huggingface/hub/models--BAAI--bge-large-en-v1.5/snapshots",
+    )
+    if not os.path.isdir(cache_root):
+        return None
+    entries = [e for e in os.listdir(cache_root)
+               if os.path.isdir(os.path.join(cache_root, e))]
+    if not entries:
+        return None
+    entries.sort(key=lambda e: os.path.getmtime(os.path.join(cache_root, e)))
+    return os.path.join(cache_root, entries[-1])
 
 
 def _load_model(name: str) -> SentenceTransformer:
-    """Load model with fallback to local cache."""
+    """加载模型：先走 hub（能用缓存就用缓存），失败再回退到本地 snapshot 目录。"""
     try:
         return SentenceTransformer(name)
     except Exception:
-        if _FALLBACK and os.path.isdir(_FALLBACK):
-            return SentenceTransformer(_FALLBACK)
+        fallback = _fallback_snapshot()
+        if fallback:
+            return SentenceTransformer(fallback)
         raise
 
 

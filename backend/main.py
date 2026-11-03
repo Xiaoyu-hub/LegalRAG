@@ -25,6 +25,15 @@ from backend.api.search import router as search_router
 
 logger = logging.getLogger(__name__)
 
+# uvicorn 只配置自己的 logger，应用侧的 logger.info 默认被 root 的 WARNING 静默吞掉：
+# 不显式配置的话，启动日志（加载索引、映射校验、重建）在控制台一行都看不到。
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    )
+    logging.getLogger("backend").setLevel(logging.INFO)
+
 # ── App Factory ────────────────────────────────────────────────────────────
 
 app = FastAPI(
@@ -87,10 +96,26 @@ async def startup():
 
     # Restore FAISS index from disk if it exists
     faiss_path = "data/index/vector.faiss"
+    db_chunk_ids = []
+    try:
+        db_chunk_ids = app.state.metadata_store.get_all_chunk_ids()
+    except Exception as exc:
+        logger.warning("Could not read chunk ids from DB: %s", exc)
+
     if os.path.exists(faiss_path):
         try:
             vs.load(faiss_path)
             logger.info("Loaded FAISS index from %s (%d vectors)", faiss_path, vs.size)
+            # 启动校验：索引里的 position→chunk_id 映射必须与数据库 id 集合一致。
+            # 不一致的成因：.ids.npy 缺失、删除过文档、索引与映射文件不同步。
+            if not vs.mapping_matches(db_chunk_ids):
+                logger.warning(
+                    "index_manifest_mismatch: faiss=%d vectors, db=%d chunks, mapping_trusted=%s "
+                    "— rebuilding indexes from SQLite",
+                    vs.size, len(db_chunk_ids), vs.mapping_trusted,
+                )
+                n = app.state.indexer.rebuild_all()
+                logger.info("Rebuilt FAISS index with %d chunks", n)
         except Exception as exc:
             logger.warning("Could not load FAISS index: %s", exc)
 
@@ -125,8 +150,18 @@ async def startup():
     except Exception as exc:
         logger.warning("Could not restore document statuses: %s", exc)
 
-    # Citation retrieval buffer for Plan 2 (chat endpoint)
-    app.state.last_chat_sources = []
+    # Citation retrieval buffer for Plan 2 (chat endpoint) —— 按会话 id 分槽
+    app.state.last_chat_sources = {}
+    app.state.last_chat_citations = {}
+
+    # 重排器：启动时不加载模型（90MB + 几秒），首次用到再懒加载
+    app.state.reranker = None
+    try:
+        from backend.retrieval.reranker import Reranker
+        app.state.reranker = Reranker.get_instance()
+        logger.info("Reranker ready: %s", app.state.reranker.model_name)
+    except Exception as exc:
+        logger.warning("Reranker unavailable, serving hybrid order only: %s", exc)
 
     logger.info("LegalRAG API startup complete")
 
