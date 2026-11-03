@@ -23,7 +23,10 @@ BASE = f"http://127.0.0.1:{PORT}"
 TENANT = "e2e"
 WORK = os.path.join(REPO, "data", "e2e_tmp")
 ENV = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1",
-           HF_HUB_OFFLINE="1", LLM_PROVIDER="fake", FAKE_LATENCY_MS="0")
+           LLM_PROVIDER="fake", FAKE_LATENCY_MS="0")
+# 本机可离线跑（模型已缓存）；CI 首次跑要联网拉模型，所以不能写死离线
+if os.getenv("HF_HUB_OFFLINE"):
+    ENV["HF_HUB_OFFLINE"] = os.environ["HF_HUB_OFFLINE"]
 
 PASS, FAIL = [], []
 

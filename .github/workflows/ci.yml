@@ -1,0 +1,77 @@
+name: CI
+
+# 面试说法：「代码要能上线，不是跑通就算完」——CI 就是这句话的证据。
+# 三个 job：单测与契约测试 → 端到端自检 → （同一 job 内的）pgvector 契约。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: unit + contract + e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    services:
+      # pgvector 契约测试要真库；本地 Docker 拉不到镜像，CI 里能跑
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: legalrag
+          POSTGRES_PASSWORD: legalrag
+          POSTGRES_DB: legalrag_vectors
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      PG_DSN: "host=127.0.0.1 port=5432 user=legalrag password=legalrag dbname=legalrag_vectors"
+      # CI 里不跑真模型：网关走假后端，但向量与重排仍是真模型
+      LLM_PROVIDER: fake
+      PYTHONIOENCODING: utf-8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # BGE-large 有 1.3GB，每次都下载既慢又费流量；用缓存
+      - name: Cache HF models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-bge-large-en-v1.5-msmarco-minilm-l6
+
+      - name: Unit + contract tests
+        run: pytest tests -q
+
+      - name: End-to-end check
+        run: python docs/e2e_check.py
+
+      - name: Upload e2e logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: |
+            data/e2e_tmp/*.log
+          if-no-files-found: ignore

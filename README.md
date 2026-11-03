@@ -1,6 +1,24 @@
-# LegalRAG — Legal Document Q&A System
+# LegalRAG — 多租户 RAG 服务 + LLM 网关
 
-LegalRAG is a Retrieval-Augmented Generation system for English legal documents. Upload PDF legal documents and ask natural language questions — answers include inline citations to specific Articles and Sections.
+A Retrieval-Augmented Generation service for English legal documents, plus a multi-tenant LLM gateway.
+Upload PDFs and ask questions — answers carry inline citations down to Article / Section.
+
+> 2026-11 定位升级：从「单租户法律文书问答」变成「多租户 RAG 服务 + LLM 网关」。
+> 新增：租户隔离（元数据 / 向量 / 关键词）、
+> LLM 网关（多后端路由、主备降级、配额、token 计量与成本归因）、
+> Prometheus 指标与 OpenTelemetry span、FAISS 与 pgvector 双后端。
+
+## 自检与 CI
+
+```bash
+python -m pytest tests -q          # 199 个单测与契约测试
+python docs/e2e_check.py           # 端到端：上传 → 索引 → 检索 → 问答 → 重启一致（22 项断言）
+python docs/trace_demo.py          # 打印一次问答的 span 树
+python docs/loadtest.py            # 并发压测，出「并发 vs P99」表（需先起服务）
+```
+
+GitHub Actions（`.github/workflows/ci.yml`）跑同样的三步：单测 → 端到端自检 →
+带 pgvector 服务容器的契约测试。生成段用 `LLM_PROVIDER=fake`，不依赖真模型服务。
 
 ## Architecture
 
