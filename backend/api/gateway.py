@@ -36,11 +36,16 @@ def _err(status: int, message: str) -> dict:
 
 
 @router.post("/chat")
-async def gateway_chat(
+def gateway_chat(
     req: GatewayChatRequest,
     request: Request,
     x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),
 ):
+    """网关对话。
+
+    同 search：底层是同步 HTTP 调用（ollama / openai），写成 async def 会串行化。
+    实测 async 版本并发 1→16 吞吐恒为 ~20.8 rps，P99 从 66ms 涨到 2292ms。
+    """
     gw = request.app.state.gateway
 
     try:

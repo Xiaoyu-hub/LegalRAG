@@ -33,7 +33,9 @@ def build_provider(kind: str | None = None, model: str | None = None,
 
     if kind == "fake":
         from backend.generation.providers.fake import FakeProvider
-        return FakeProvider()
+        # 压测时会用 FAKE_LATENCY_MS 模拟真实模型耗时
+        latency_ms = float(os.getenv("FAKE_LATENCY_MS", "0") or 0)
+        return FakeProvider(latency_sec=latency_ms / 1000.0)
 
     raise ValueError(
         f"Unknown provider {kind!r}; expected one of ollama / openai / fake"

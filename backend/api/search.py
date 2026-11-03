@@ -19,8 +19,14 @@ class SearchRequest(BaseModel):
 
 
 @router.post("/")
-async def search(req: SearchRequest,
-                 x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id")):
+def search(req: SearchRequest,
+           x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id")):
+    """向量+关键词混合检索。
+
+    注意这里故意用 `def` 而不是 `async def`：内层是 CPU 密集的同步调用
+   （torch 编码 + FAISS + cross-encoder），写成 async def 会把整个事件循环卡住。
+    压测实测：async 版本并发 1→8 时吞吐恒为 3.1 rps、P99 从 596ms 涨到 4209ms。
+    """
     tenant = x_tenant_id or "demo"
     if req.top_k > 50:
         req.top_k = 50
