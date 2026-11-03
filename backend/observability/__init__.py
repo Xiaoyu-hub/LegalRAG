@@ -11,6 +11,12 @@ from backend.observability.metrics import (
     record_success,
     render,
 )
+from backend.observability.tracing import (
+    get_finished_spans,
+    reset_for_tests,
+    setup_tracing,
+    span,
+)
 
 __all__ = [
     "REGISTRY",
@@ -23,4 +29,8 @@ __all__ = [
     "record_error",
     "record_rejection",
     "render",
+    "setup_tracing",
+    "span",
+    "get_finished_spans",
+    "reset_for_tests",
 ]

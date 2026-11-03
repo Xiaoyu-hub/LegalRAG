@@ -72,6 +72,24 @@ class HybridSearch:
         alpha: float | None = None,
         top_k: int | None = None
     ) -> list[tuple[int, float]]:
+        """混合检索入口，外面包一层 span 记录耗时与规模。"""
+        from backend.observability import span as _span
+
+        use_alpha = alpha if alpha is not None else self.alpha
+        with _span("retrieval.hybrid", **{"tenant": self.tenant, "alpha": use_alpha,
+                                          "top_k": top_k or self.top_k}) as sp:
+            results = self._search_impl(query_vec, tokenized_query, alpha, top_k)
+            sp.set_attribute("retrieval.n_total", len(self.vector_store.chunk_ids))
+            sp.set_attribute("retrieval.returned", len(results))
+            return results
+
+    def _search_impl(
+        self,
+        query_vec: np.ndarray,
+        tokenized_query: list[str],
+        alpha: float | None = None,
+        top_k: int | None = None
+    ) -> list[tuple[int, float]]:
         """Hybrid search: vector + BM25 with min-max normalized score fusion.
         
         Args:

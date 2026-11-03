@@ -112,6 +112,26 @@ class LLMGateway:
         user_prompt: str,
         model: str | None = None,
     ) -> GatewayResult:
+        from backend.observability import span as _span
+
+        with _span("llm.complete", **{"tenant": tenant_id, "llm.model": model}) as sp:
+            result = self._complete_inner(tenant_id, system_prompt, user_prompt, model)
+            sp.set_attribute("llm.model", result.model)
+            sp.set_attribute("llm.provider", result.provider)
+            sp.set_attribute("llm.prompt_tokens", result.prompt_tokens)
+            sp.set_attribute("llm.completion_tokens", result.completion_tokens)
+            sp.set_attribute("llm.cost_usd", result.cost_usd)
+            if result.fallback_from:
+                sp.set_attribute("llm.fallback_from", result.fallback_from)
+            return result
+
+    def _complete_inner(
+        self,
+        tenant_id: str | None,
+        system_prompt: str,
+        user_prompt: str,
+        model: str | None = None,
+    ) -> GatewayResult:
         tenant = self.tenants.get(tenant_id)
         self._check_quota(tenant)
 

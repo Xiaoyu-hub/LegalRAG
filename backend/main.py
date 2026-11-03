@@ -163,6 +163,15 @@ async def startup():
     except Exception as exc:
         logger.warning("Could not restore document statuses: %s", exc)
 
+    # 可观测性：trace 默认落在内存（测试可断言），生产可切 console / OTLP
+    try:
+        from backend.observability import setup_tracing
+        setup_tracing()
+        logger.info("Tracing ready: exporter=%s",
+                    __import__("os").getenv("OTEL_EXPORTER", "memory"))
+    except Exception as exc:
+        logger.warning("Tracing unavailable: %s", exc)
+
     # Citation retrieval buffer for Plan 2 (chat endpoint) —— 按会话 id 分槽
     app.state.last_chat_sources = {}
     app.state.last_chat_citations = {}

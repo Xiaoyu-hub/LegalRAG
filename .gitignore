@@ -17,3 +17,4 @@ logs/
 data/usage.db
 
 data/index/*/
+data/usage*.db

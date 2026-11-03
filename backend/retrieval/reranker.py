@@ -98,9 +98,15 @@ class Reranker:
         """
         if not passages:
             return []
-        
-        results = self.model.rank(query, passages, top_k=top_k)
-        
+
+        from backend.observability import span as _span
+
+        with _span("retrieval.rerank", **{"rerank.model": self.model_name,
+                                          "rerank.inputs": len(passages),
+                                          "rerank.top_k": top_k}) as sp:
+            results = self.model.rank(query, passages, top_k=top_k)
+            sp.set_attribute("rerank.returned", len(results))
+
         return [
             {
                 "corpus_id": r["corpus_id"],

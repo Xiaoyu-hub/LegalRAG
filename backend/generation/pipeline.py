@@ -24,11 +24,16 @@ class GenerationPipeline:
         recall_k: int = 10,
         rerank_top_k: int = 5,
         provider=None,
+        gateway=None,
+        tenant: str = "demo",
     ):
         self.retriever = retriever
         self.metadata_store = metadata_store
         self.prompt_builder = PromptBuilder(max_tokens=INPUT_TOKEN_BUDGET)
         self.generator = Generator(model=model, fallback=fallback, provider=provider)
+        # 传入 gateway 时，生成改走网关（多租户 / 配额 / 计量 / 跟踪都在那一层）
+        self.gateway = gateway
+        self.tenant = tenant
         self.citation_builder = CitationBuilder()
         self.last_chunks = []
         # 重排阶段：召回 10 → cross-encoder 重排 → 留 5（D-18 / D-17）
@@ -65,22 +70,38 @@ class GenerationPipeline:
         return chunks
 
     def answer(self, query: str, document_id: int | None = None) -> str:
-        chunks = self._retrieve(query, document_id)
-        self.last_chunks = chunks
+        from backend.observability import span as _span
 
-        system_prompt, user_prompt = self.prompt_builder.build(query, chunks)
-        raw_text = self.generator.generate(system_prompt, user_prompt)
-        cleaned_text, citations = self.citation_builder.process(
-            raw_text, chunks
-        )
-        self.last_citations = citations
+        with _span("rag.answer", **{"rag.query_chars": len(query),
+                                    "rag.document_id": document_id}) as sp:
+            chunks = self._retrieve(query, document_id)
+            self.last_chunks = chunks
+            sp.set_attribute("rag.chunks", len(chunks))
 
-        logger.info(
-            "Generated answer with %d citations (%d valid)",
-            len(citations),
-            sum(1 for c in citations if c.valid),
-        )
-        return cleaned_text
+            system_prompt, user_prompt = self.prompt_builder.build(query, chunks)
+            if self.gateway is not None:
+                res = self.gateway.complete(self.tenant, system_prompt, user_prompt)
+                raw_text = res.content
+                sp.set_attribute("rag.llm_model", res.model)
+                sp.set_attribute("rag.llm_tokens", res.prompt_tokens + res.completion_tokens)
+                sp.set_attribute("rag.llm_cost_usd", res.cost_usd)
+            else:
+                raw_text = self.generator.generate(system_prompt, user_prompt)
+            cleaned_text, citations = self.citation_builder.process(
+                raw_text, chunks
+            )
+            self.last_citations = citations
+
+            valid = sum(1 for c in citations if c.valid)
+            sp.set_attribute("rag.citations", len(citations))
+            sp.set_attribute("rag.citations_valid", valid)
+
+            logger.info(
+                "Generated answer with %d citations (%d valid)",
+                len(citations),
+                valid,
+            )
+            return cleaned_text
 
     def answer_stream(self, query: str, document_id: int | None = None):
         """流式输出。流内不改字，但流结束后仍要跑一次引用校验。
@@ -94,9 +115,14 @@ class GenerationPipeline:
 
         system_prompt, user_prompt = self.prompt_builder.build(query, chunks)
         buffer: list[str] = []
-        for token in self.generator.generate_stream(system_prompt, user_prompt):
-            buffer.append(token)
-            yield token
+        if self.gateway is not None:
+            for piece in self.gateway.stream(self.tenant, system_prompt, user_prompt):
+                buffer.append(piece)
+                yield piece
+        else:
+            for token in self.generator.generate_stream(system_prompt, user_prompt):
+                buffer.append(token)
+                yield token
 
         _, citations = self.citation_builder.process("".join(buffer), chunks)
         self.last_citations = citations
