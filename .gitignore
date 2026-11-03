@@ -13,3 +13,5 @@ logs/
 
 # 本地模型缓存
 .cache/
+
+data/usage.db

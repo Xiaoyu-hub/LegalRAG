@@ -1,0 +1,28 @@
+# 模型价格表（每 100 万 token，美元）
+#
+# 规则：**没去官方定价页核实过的数字不要填**，留 0 并在 source 里写待核实。
+# 面试被问「这个价格哪来的」要能指到出处；编一个看起来合理的数字比留 0 更糟。
+#
+# 本地模型（Ollama）边际成本≈0：只有电费与机器折旧，不按 token 计费。
+
+models:
+  llama3.2:3b:
+    input_per_1m: 0.0
+    output_per_1m: 0.0
+    source: "本地 Ollama 推理，无按量计费"
+
+  llama3.1:8b:
+    input_per_1m: 0.0
+    output_per_1m: 0.0
+    source: "本地 Ollama 推理，无按量计费"
+
+  fake-model:
+    input_per_1m: 0.0
+    output_per_1m: 0.0
+    source: "测试用假后端"
+
+  # 下面是「接云 API 时怎么填」的示例占位，数值未核实，故全部留 0：
+  # <provider>/<model>:
+  #   input_per_1m: <去官方定价页抄>
+  #   output_per_1m: <去官方定价页抄>
+  #   source: "<定价页 URL>"

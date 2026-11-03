@@ -1,0 +1,31 @@
+# 租户配置：模型白名单、预算、限速
+#
+# 多租户的含义在这里是**数据面隔离 + 计费归属**：
+#   - 每个租户只能调白名单里的模型（防止一个租户把贵的模型跑穿）
+#   - 每个租户有月度预算，超了直接 429，而不是等月底账单爆炸
+#   - rpm/rpd 限速，防止单租户打满后端
+
+default_tenant: demo
+
+tenants:
+  demo:
+    name: "演示租户"
+    models: ["llama3.2:3b", "llama3.1:8b"]
+    monthly_budget_usd: 5.0
+    rpm_limit: 60
+    default_model: "llama3.2:3b"
+
+  legal:
+    name: "法律文书（默认语料）"
+    models: ["llama3.2:3b", "llama3.1:8b"]
+    monthly_budget_usd: 20.0
+    rpm_limit: 120
+    default_model: "llama3.2:3b"
+
+  # 预算设成 0 的租户：用来演示「超限返回 429」这条路径
+  broke:
+    name: "零预算租户"
+    models: ["llama3.2:3b"]
+    monthly_budget_usd: 0.0
+    rpm_limit: 5
+    default_model: "llama3.2:3b"

@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse
 
 from backend.api.chat import router as chat_router
 from backend.api.documents import router as documents_router
+from backend.api.gateway import router as gateway_router
 from backend.api.search import router as search_router
 
 logger = logging.getLogger(__name__)
@@ -163,6 +164,33 @@ async def startup():
     except Exception as exc:
         logger.warning("Reranker unavailable, serving hybrid order only: %s", exc)
 
+    # ── LLM 网关（多租户 / 配额 / 计量 / 降级）──
+    # 启动时构造：price 表与租户配置都从 configs/ 读，改 YAML 重启即生效
+    try:
+        from backend.gateway import LLMGateway, MeteringStore, PricingTable, TenantRegistry
+        from backend.generation.providers import build_provider
+
+        model = __import__("os").getenv("LLM_MODEL", "llama3.2:3b")
+        fallback = __import__("os").getenv("LLM_FALLBACK_MODEL", "llama3.1:8b")
+        kind = __import__("os").getenv("LLM_PROVIDER", "ollama")
+        # 当前默认只有 ollama 一个后端；配 LLM_PROVIDER=fake 可在无模型环境下
+        # 跑通网关链路（配额 / 计量 / 降级都能验）；接云 API 时在这里加 provider 与 routes
+        providers = {kind: build_provider(kind, model=model, fallback=fallback)}
+        routes = {model: kind, fallback: kind}
+
+        app.state.gateway = LLMGateway(
+            providers=providers,
+            routes=routes,
+            pricing=PricingTable.load(),
+            tenants=TenantRegistry.load(),
+            metering=MeteringStore(),
+        )
+        logger.info("LLM gateway ready: providers=%s routes=%s",
+                    list(providers), routes)
+    except Exception as exc:
+        app.state.gateway = None
+        logger.warning("LLM gateway unavailable: %s", exc)
+
     logger.info("LegalRAG API startup complete")
 
 
@@ -177,6 +205,7 @@ async def shutdown():
 app.include_router(documents_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(search_router, prefix="/api/v1")
+app.include_router(gateway_router, prefix="/api/v1")
 
 
 # ── Health Endpoint (D-07) ─────────────────────────────────────────────────
