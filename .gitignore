@@ -18,3 +18,4 @@ data/usage.db
 
 data/index/*/
 data/usage*.db
+data/e2e_tmp/

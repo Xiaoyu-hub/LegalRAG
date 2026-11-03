@@ -8,9 +8,12 @@
 """
 import logging
 
-from fastapi import APIRouter, Header, Request
+from fastapi import APIRouter, Depends, Header, Request
+from fastapi.responses import JSONResponse
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+from backend.api.deps import resolve_tenant
 
 from backend.gateway import (
     ModelNotAllowed,
@@ -39,7 +42,7 @@ def _err(status: int, message: str) -> dict:
 def gateway_chat(
     req: GatewayChatRequest,
     request: Request,
-    x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),
+    tenant: str = Depends(resolve_tenant),
 ):
     """网关对话。
 
@@ -50,10 +53,10 @@ def gateway_chat(
 
     try:
         if req.stream:
-            gen = gw.stream(x_tenant_id, req.system, req.question, model=req.model)
+            gen = gw.stream(tenant, req.system, req.question, model=req.model)
             return StreamingResponse(gen, media_type="text/plain")
 
-        res = gw.complete(x_tenant_id, req.system, req.question, model=req.model)
+        res = gw.complete(tenant, req.system, req.question, model=req.model)
         return {
             "status": "ok",
             "data": {
@@ -91,10 +94,10 @@ def gateway_chat(
 
 @router.get("/usage")
 async def gateway_usage(request: Request,
-                        x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id")):
+                        tenant: str = Depends(resolve_tenant)):
     gw = request.app.state.gateway
     try:
-        return {"status": "ok", "data": gw.usage(x_tenant_id), "error": None}
+        return {"status": "ok", "data": gw.usage(tenant), "error": None}
     except UnknownTenant as exc:
         from fastapi.responses import JSONResponse
         return JSONResponse(status_code=401, content={

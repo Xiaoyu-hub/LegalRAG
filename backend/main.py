@@ -199,11 +199,15 @@ async def startup():
         providers = {kind: build_provider(kind, model=model, fallback=fallback)}
         routes = {model: kind, fallback: kind}
 
+        # 租户注册表只建一份：网关与 documents / search 共用，避免两套口径
+        registry = TenantRegistry.load()
+        app.state.tenant_registry = registry
+
         app.state.gateway = LLMGateway(
             providers=providers,
             routes=routes,
             pricing=PricingTable.load(),
-            tenants=TenantRegistry.load(),
+            tenants=registry,
             metering=MeteringStore(),
         )
         logger.info("LLM gateway ready: providers=%s routes=%s",

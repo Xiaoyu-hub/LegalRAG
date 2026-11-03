@@ -30,6 +30,14 @@ tenants:
     rpm_limit: null
     default_model: "llama3.2:3b"
 
+  # 端到端自检专用（docs/e2e_check.py）
+  e2e:
+    name: "端到端自检"
+    models: ["llama3.2:3b", "llama3.1:8b"]
+    monthly_budget_usd: null
+    rpm_limit: null
+    default_model: "llama3.2:3b"
+
   # 预算设成 0 的租户：用来演示「超限返回 429」这条路径
   broke:
     name: "零预算租户"

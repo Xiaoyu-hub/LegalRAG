@@ -7,8 +7,9 @@ Per D-06: Unified response wrapper: {"status": "ok"|"error", "data": ..., "error
 import logging
 import os
 
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, UploadFile
 
+from backend.api.deps import resolve_tenant
 from backend.pipeline.indexer import Indexer
 from backend.models.document import Document
 from backend.storage.metadata_store import MetadataStore
@@ -73,7 +74,7 @@ async def upload_document(
     file: UploadFile,
     background_tasks: BackgroundTasks,
     request: Request,
-    x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),
+    tenant: str = Depends(resolve_tenant),
 ):
     """Upload a PDF document for parsing and indexing.
 
@@ -93,7 +94,6 @@ async def upload_document(
         return _unified_response("error", None, exc.detail)
 
     # --- Read content and enforce size limit ---
-    tenant = x_tenant_id or "demo"
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
         return _unified_response("error", None, "File size exceeds 50 MB limit")
@@ -136,10 +136,7 @@ async def upload_document(
 
 
 @router.get("/")
-async def list_documents(request: Request,
-                        x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id")):
-    """List all uploaded documents with status and chunk count（仅当前租户）。"""
-    tenant = x_tenant_id or "demo"
+async def list_documents(request: Request, tenant: str = Depends(resolve_tenant)):
     metadata_store: MetadataStore = request.app.state.metadata_store
     documents = []
     for doc in metadata_store.get_all_documents(tenant):
@@ -159,10 +156,7 @@ async def list_documents(request: Request,
 
 
 @router.get("/{doc_id}")
-async def get_document(doc_id: int, request: Request,
-                       x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id")):
-    """Get a single document by ID with status and chunk count."""
-    tenant = x_tenant_id or "demo"
+async def get_document(doc_id: int, request: Request, tenant: str = Depends(resolve_tenant)):
     metadata_store: MetadataStore = request.app.state.metadata_store
     doc = metadata_store.get_document(doc_id, tenant=tenant)
     if doc is None:
@@ -180,10 +174,7 @@ async def get_document(doc_id: int, request: Request,
 
 
 @router.get("/{doc_id}/status")
-async def get_document_status(doc_id: int, request: Request,
-                              x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id")):
-    """Poll processing status for a document (D-05)."""
-    tenant = x_tenant_id or "demo"
+async def get_document_status(doc_id: int, request: Request, tenant: str = Depends(resolve_tenant)):
     metadata_store: MetadataStore = request.app.state.metadata_store
     doc = metadata_store.get_document(doc_id, tenant=tenant)
     if doc is None:
@@ -197,10 +188,7 @@ async def get_document_status(doc_id: int, request: Request,
 
 
 @router.get("/{doc_id}/chunks")
-async def get_document_chunks(doc_id: int, request: Request,
-                              x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id")):
-    """Get all chunks for a document preview (D-12)."""
-    tenant = x_tenant_id or "demo"
+async def get_document_chunks(doc_id: int, request: Request, tenant: str = Depends(resolve_tenant)):
     metadata_store: MetadataStore = request.app.state.metadata_store
     doc = metadata_store.get_document(doc_id, tenant=tenant)
     if doc is None:
