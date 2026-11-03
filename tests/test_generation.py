@@ -274,21 +274,24 @@ class TestGenerator:
         from backend.generation.generator import Generator
         return Generator()
 
+    # 生成逻辑已下沉到 providers/ollama_provider，mock 目标随之改到这里；
+    # 这样测的仍是真实主链（Generator → OllamaProvider → ollama.chat）。
+    PATCH = "backend.generation.providers.ollama_provider.chat"
+
     def test_generate_success(self, mocker, generator):
         mock_response = mocker.MagicMock()
         mock_response.message.content = "Generated answer [Article I, Section 1]."
-        mocker.patch(
-            "backend.generation.generator.chat",
-            return_value=mock_response,
-        )
+        mocker.patch(self.PATCH, return_value=mock_response)
         result = generator.generate("system", "user")
         assert "Generated answer" in result
+        assert generator.last_model_used == generator.model
+        assert generator.last_token_count > 0, "token 计数必须是真实计数，不能是 None"
 
     def test_generate_fallback_on_404(self, mocker, generator):
         mock_response = mocker.MagicMock()
         mock_response.message.content = "Fallback answer."
-        mock_chat = mocker.patch(
-            "backend.generation.generator.chat",
+        mocker.patch(
+            self.PATCH,
             side_effect=[
                 __import__("ollama").ResponseError("model not found", 404),
                 mock_response,
@@ -302,28 +305,20 @@ class TestGenerator:
         assert generator.last_model_used == DEFAULT_FALLBACK_MODEL
 
     def test_generate_raises_connection_error(self, mocker, generator):
-        mocker.patch(
-            "backend.generation.generator.chat",
-            side_effect=ConnectionError("refused"),
-        )
+        mocker.patch(self.PATCH, side_effect=ConnectionError("refused"))
         with pytest.raises(ConnectionError, match="Cannot connect to Ollama"):
             generator.generate("system", "user")
 
     def test_generate_raises_runtime_error_when_both_fail(self, mocker, generator):
         err_404 = __import__("ollama").ResponseError("model not found", 404)
-        mocker.patch(
-            "backend.generation.generator.chat",
-            side_effect=[err_404, err_404],
-        )
+        mocker.patch(self.PATCH, side_effect=[err_404, err_404])
         with pytest.raises(RuntimeError, match="Neither"):
             generator.generate("system", "user")
 
     def test_generate_propagates_non_404_error(self, mocker, generator):
         mocker.patch(
-            "backend.generation.generator.chat",
-            side_effect=__import__("ollama").ResponseError(
-                "Bad request", 400
-            ),
+            self.PATCH,
+            side_effect=__import__("ollama").ResponseError("Bad request", 400),
         )
         with pytest.raises(__import__("ollama").ResponseError):
             generator.generate("system", "user")
@@ -334,7 +329,7 @@ class TestGenerator:
         mock_response = mocker.MagicMock()
         mock_response.models = [mock_model]
         mocker.patch(
-            "backend.generation.generator.ollama_list",
+            "backend.generation.providers.ollama_provider.ollama_list",
             return_value=mock_response,
         )
         assert generator.ensure_model_available("llama3.1:8b") is True
@@ -345,12 +340,12 @@ class TestGenerator:
         mock_pull_response = mocker.MagicMock()
         mock_pull_response.status = "pulling"
 
-        mock_list = mocker.patch(
-            "backend.generation.generator.ollama_list",
+        mocker.patch(
+            "backend.generation.providers.ollama_provider.ollama_list",
             return_value=mock_empty_response,
         )
         mock_pull = mocker.patch(
-            "backend.generation.generator.pull",
+            "backend.generation.providers.ollama_provider.pull",
             return_value=[mock_pull_response],
         )
         assert generator.ensure_model_available("llama3.1:8b") is True

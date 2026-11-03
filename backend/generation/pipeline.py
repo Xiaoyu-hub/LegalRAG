@@ -4,11 +4,10 @@ from backend.generation.citation_builder import CitationBuilder
 from backend.generation.generator import (
     DEFAULT_FALLBACK_MODEL,
     DEFAULT_MODEL,
-    NUM_CTX,
-    NUM_PREDICT,
 )
 from backend.generation.generator import Generator
 from backend.generation.prompt_builder import PromptBuilder
+from backend.generation.tokens import INPUT_TOKEN_BUDGET
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +23,12 @@ class GenerationPipeline:
         reranker=None,
         recall_k: int = 10,
         rerank_top_k: int = 5,
+        provider=None,
     ):
         self.retriever = retriever
         self.metadata_store = metadata_store
-        self.prompt_builder = PromptBuilder(max_tokens=NUM_CTX - NUM_PREDICT)
-        self.generator = Generator(model=model, fallback=fallback)
+        self.prompt_builder = PromptBuilder(max_tokens=INPUT_TOKEN_BUDGET)
+        self.generator = Generator(model=model, fallback=fallback, provider=provider)
         self.citation_builder = CitationBuilder()
         self.last_chunks = []
         # 重排阶段：召回 10 → cross-encoder 重排 → 留 5（D-18 / D-17）
@@ -37,6 +37,8 @@ class GenerationPipeline:
         self.recall_k = recall_k
         self.rerank_top_k = rerank_top_k
         self.last_reranked = []
+        # 引用校验结果：整段与流式两条路径都写这个字段，调用方统一读它
+        self.last_citations = []
 
     def _retrieve(self, query: str, document_id: int | None = None):
         """召回 → 取元数据 → 重排。返回送给 prompt 的最终 chunk 列表。"""
@@ -71,6 +73,7 @@ class GenerationPipeline:
         cleaned_text, citations = self.citation_builder.process(
             raw_text, chunks
         )
+        self.last_citations = citations
 
         logger.info(
             "Generated answer with %d citations (%d valid)",

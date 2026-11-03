@@ -30,16 +30,21 @@ def normalize_scores(scores: np.ndarray) -> np.ndarray:
 class HybridSearch:
     """Hybrid search combining BM25 and vector results with score normalization."""
     
-    def __init__(self, alpha: float = 0.7, top_k: int = 10):
+    def __init__(self, alpha: float = 0.7, top_k: int = 10, vector_store=None):
         """Initialize hybrid search.
-        
+
         Args:
             alpha: Vector weight (default 0.7 per D-15)
             top_k: Number of results to return (default 10 per D-18)
+            vector_store: 任意满足 VectorStore 接口的后端（faiss / pgvector / 测试桩）
         """
         self.alpha = alpha
         self.top_k = top_k
-        self.vector_search = VectorSearch.get_instance()
+        if vector_store is None:
+            from backend.retrieval.stores import build_vector_store
+            vector_store = build_vector_store()
+        self.vector_store = vector_store
+        self.vector_search = getattr(vector_store, "inner", vector_store)
         self.bm25 = BM25Retriever.get_instance()
     
     def retrieve(
@@ -77,30 +82,29 @@ class HybridSearch:
         """
         alpha = alpha if alpha is not None else self.alpha
         k = top_k if top_k is not None else self.top_k
-        
-        n_total = self.vector_search.size
+
+        store = self.vector_store
+        n_total = store.size
         if n_total == 0:
             return []
-        
-        vec_distances, vec_indices = self.vector_search.search(query_vec, k=k * 2)
+
+        # 向量库接口直接给 (chunk_id, score)，不再暴露内部位置
+        vec_hits = store.search_ids(query_vec, k=k * 2)
         bm25_scores = self.bm25.get_scores(tokenized_query)
-        
-        vec_scores = np.zeros(n_total, dtype=np.float32)
-        for dist, idx in zip(vec_distances[0], vec_indices[0]):
-            if idx != -1:
-                vec_scores[idx] = dist
-        
+
+        all_ids = list(store.chunk_ids)
+        pos_of = {cid: i for i, cid in enumerate(all_ids)}
+
+        vec_scores = np.zeros(len(all_ids), dtype=np.float32)
+        for cid, score in vec_hits:
+            p = pos_of.get(cid)
+            if p is not None:
+                vec_scores[p] = score
+
         vec_norm = normalize_scores(vec_scores)
         bm25_norm = normalize_scores(bm25_scores)
-        
+
         hybrid = alpha * vec_norm + (1.0 - alpha) * bm25_norm
 
         top_indices = np.argsort(hybrid)[::-1][:k]
-        # FAISS 返回的是索引内部位置（0..N-1），业务 id 存在 chunk_ids 里；
-        # 上游（pipeline / api/search）拿返回值去查 SQLite 主键，所以这里必须
-        # 转成真实 chunk_id，否则每条命中都偏一条，top-1 直接消失。
-        mapped = self.vector_search.chunk_ids
-        return [
-            (int(mapped[idx]) if idx < len(mapped) else int(idx), float(hybrid[idx]))
-            for idx in top_indices
-        ]
+        return [(int(all_ids[i]), float(hybrid[i])) for i in top_indices]

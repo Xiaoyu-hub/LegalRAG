@@ -77,6 +77,24 @@ class VectorSearch:
         """Map FAISS index positions to chunk IDs."""
         return [self.chunk_ids[i] if i != -1 else -1 for i in indices[0]]
 
+    def search_ids(self, query_vec: np.ndarray, k: int = 10) -> list[tuple[int, float]]:
+        """搜索并直接返回 (chunk_id, score)。
+
+        上层（HybridSearch / Pipeline / API）只应看到业务 id；位置映射留在本层，
+        否则调用方很容易把位置当主键用（历史缺陷）。
+        """
+        distances, indices = self.search(query_vec, k=k)
+        out: list[tuple[int, float]] = []
+        for dist, idx in zip(distances[0], indices[0]):
+            if idx == -1:
+                continue
+            if idx < len(self.chunk_ids):
+                out.append((int(self.chunk_ids[idx]), float(dist)))
+            else:
+                # 映射缺失时不猜业务 id，宁可少返回
+                continue
+        return out
+
     def save(self, path: str):
         """Save FAISS index to file, plus the position→chunk_id mapping.
 
