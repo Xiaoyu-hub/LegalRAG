@@ -12,3 +12,4 @@ class Document:
     file_path: str = ""
     file_size: int = 0
     created_at: datetime = field(default_factory=datetime.now)
+    tenant: str = "demo"

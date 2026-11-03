@@ -8,20 +8,22 @@ from rank_bm25 import BM25Okapi
 
 
 class BM25Retriever:
-    _instance = None
+    # 按租户隔离：每个 tenant 一套 BM25 倒排，否则 A 租户的文档会进 B 租户的召回
+    _instances: dict[str, "BM25Retriever"] = {}
 
-    def __init__(self):
-        if BM25Retriever._instance is not None:
+    def __init__(self, tenant: str = "demo"):
+        if tenant in BM25Retriever._instances:
             raise RuntimeError("Use BM25Retriever.get_instance() instead")
+        self.tenant = tenant
         self.bm25 = None
         self.chunk_ids = []
         self.corpus = []
 
     @classmethod
-    def get_instance(cls):
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
+    def get_instance(cls, tenant: str = "demo"):
+        if tenant not in cls._instances:
+            cls._instances[tenant] = cls(tenant)
+        return cls._instances[tenant]
 
     @staticmethod
     def tokenize(text: str) -> list[str]:

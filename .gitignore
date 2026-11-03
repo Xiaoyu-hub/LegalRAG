@@ -15,3 +15,5 @@ logs/
 .cache/
 
 data/usage.db
+
+data/index/*/

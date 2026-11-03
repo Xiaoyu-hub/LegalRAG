@@ -1,7 +1,7 @@
 import logging
 
 import numpy as np
-from fastapi import APIRouter
+from fastapi import APIRouter, Header
 from pydantic import BaseModel
 
 from backend.embedding.embedder import Embedder
@@ -19,7 +19,9 @@ class SearchRequest(BaseModel):
 
 
 @router.post("/")
-async def search(req: SearchRequest):
+async def search(req: SearchRequest,
+                 x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id")):
+    tenant = x_tenant_id or "demo"
     if req.top_k > 50:
         req.top_k = 50
 
@@ -29,7 +31,7 @@ async def search(req: SearchRequest):
     # 「Article 5, Section 2」会得到 '5,' 这种永远匹配不上的 token。
     tokenized_query = BM25Retriever.tokenize(req.query)
 
-    hs = HybridSearch()
+    hs = HybridSearch(tenant=tenant)
     results = hs.search(query_vec, tokenized_query, top_k=max(req.top_k * 2, 10))
 
     from backend.storage.metadata_store import MetadataStore

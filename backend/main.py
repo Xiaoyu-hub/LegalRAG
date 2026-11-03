@@ -89,47 +89,59 @@ async def startup():
 
     # Engine singletons
     app.state.metadata_store = MetadataStore()
-    app.state.indexer = Indexer()
+    # 按租户建 Indexer：每个租户一套向量索引 + BM25，文件目录也分开
+    app.state.indexers = {}
 
-    # Pre-initialise retrieval singletons so their first use is fast
-    vs = VectorSearch.get_instance()
-    bm = BM25Retriever.get_instance()
+    def _indexer_for(tenant: str):
+        if tenant not in app.state.indexers:
+            app.state.indexers[tenant] = Indexer(tenant=tenant)
+        return app.state.indexers[tenant]
 
-    # Restore FAISS index from disk if it exists
-    faiss_path = "data/index/vector.faiss"
-    db_chunk_ids = []
+    app.get_indexer = _indexer_for  # 便于路由层按租户取
+    app.state.indexer = _indexer_for("demo")  # 向后兼容旧调用
+
+    # 按租户恢复索引：每个租户一个目录 data/index/<tenant>/vector.faiss
     try:
-        db_chunk_ids = app.state.metadata_store.get_all_chunk_ids()
+        tenants = app.state.metadata_store.list_tenants() or ["demo"]
     except Exception as exc:
-        logger.warning("Could not read chunk ids from DB: %s", exc)
+        logger.warning("Could not list tenants: %s", exc)
+        tenants = ["demo"]
 
-    if os.path.exists(faiss_path):
+    for tenant in tenants:
+        ix = _indexer_for(tenant)
+        vs_t = ix.vector_search
+        expected_ids = app.state.metadata_store.get_all_chunk_ids(tenant)
+        index_file = ix.index_path
+
+        if os.path.exists(index_file):
+            try:
+                vs_t.load(index_file)
+                logger.info("[%s] Loaded FAISS index from %s (%d vectors)",
+                            tenant, index_file, vs_t.size)
+                # 启动校验：索引里的 position→chunk_id 映射必须与数据库 id 集合一致。
+                if not vs_t.mapping_matches(expected_ids):
+                    logger.warning(
+                        "index_manifest_mismatch: tenant=%s faiss=%d vectors, db=%d chunks,"
+                        " mapping_trusted=%s — rebuilding from SQLite",
+                        tenant, vs_t.size, len(expected_ids), vs_t.mapping_trusted,
+                    )
+                    n = ix.rebuild_all()
+                    logger.info("[%s] Rebuilt FAISS index with %d chunks", tenant, n)
+            except Exception as exc:
+                logger.warning("[%s] Could not load FAISS index: %s", tenant, exc)
+        elif expected_ids:
+            # 旧版索引在 data/index/vector.faiss，新版按租户分目录；首启重建一次
+            n = ix.rebuild_all()
+            logger.info("[%s] No index file, rebuilt %d chunks", tenant, n)
+
+        # BM25 按租户重建
         try:
-            vs.load(faiss_path)
-            logger.info("Loaded FAISS index from %s (%d vectors)", faiss_path, vs.size)
-            # 启动校验：索引里的 position→chunk_id 映射必须与数据库 id 集合一致。
-            # 不一致的成因：.ids.npy 缺失、删除过文档、索引与映射文件不同步。
-            if not vs.mapping_matches(db_chunk_ids):
-                logger.warning(
-                    "index_manifest_mismatch: faiss=%d vectors, db=%d chunks, mapping_trusted=%s "
-                    "— rebuilding indexes from SQLite",
-                    vs.size, len(db_chunk_ids), vs.mapping_trusted,
-                )
-                n = app.state.indexer.rebuild_all()
-                logger.info("Rebuilt FAISS index with %d chunks", n)
+            chunks_t = app.state.metadata_store.get_all_chunks(tenant)
+            if chunks_t:
+                ix.bm25.build_index([c.text for c in chunks_t], [c.id for c in chunks_t])
+                logger.info("[%s] Rebuilt BM25 index with %d chunks", tenant, len(chunks_t))
         except Exception as exc:
-            logger.warning("Could not load FAISS index: %s", exc)
-
-    # Rebuild BM25 index from existing chunks in the database
-    try:
-        all_chunks = app.state.metadata_store.get_all_chunks()
-        if all_chunks:
-            texts = [c.text for c in all_chunks]
-            ids = [c.id for c in all_chunks]
-            bm.build_index(texts, ids)
-            logger.info("Rebuilt BM25 index with %d chunks", len(texts))
-    except Exception as exc:
-        logger.warning("Could not rebuild BM25 index: %s", exc)
+            logger.warning("[%s] Could not rebuild BM25: %s", tenant, exc)
 
     # Per-document async processing status (D-05)
     app.state.processing_status = {}
@@ -223,12 +235,23 @@ async def health(request: Request):
     except Exception:
         sqlite_status = "error"
 
-    # --- FAISS index ---
+    # --- FAISS / BM25（按租户汇总：全部租户都有索引才算 ok）---
     from backend.retrieval.vector_search import VectorSearch
-    faiss_path = "data/index/vector.faiss"
-    faiss_has_file = os.path.exists(faiss_path)
-    faiss_has_vectors = VectorSearch.get_instance().size > 0
-    faiss_status = "ok" if faiss_has_file and faiss_has_vectors else "error"
+    from backend.retrieval.bm25 import BM25Retriever
+    try:
+        indexers = getattr(request.app.state, "indexers", {}) or {"demo": None}
+        tenants = list(indexers) or ["demo"]
+        vs_ok = all(VectorSearch.get_instance(tenant=t).size > 0 for t in tenants)
+        bm_ok = all(
+            (lambda b: b.bm25 is not None and len(b.corpus) > 0)(BM25Retriever.get_instance(t))
+            for t in tenants
+        )
+        faiss_status = "ok" if vs_ok else "error"
+        bm25_status = "ok" if bm_ok else "error"
+        faiss_tenants = {t: VectorSearch.get_instance(tenant=t).size for t in tenants}
+    except Exception:
+        faiss_status = bm25_status = "error"
+        faiss_tenants = {}
 
     # --- Ollama ---
     try:
@@ -239,12 +262,6 @@ async def health(request: Request):
         ollama_status = "error"
 
     # --- BM25 ---
-    from backend.retrieval.bm25 import BM25Retriever
-    try:
-        bm25 = BM25Retriever.get_instance()
-        bm25_status = "ok" if bm25.bm25 is not None and len(bm25.corpus) > 0 else "error"
-    except Exception:
-        bm25_status = "error"
 
     # --- Embedder ---
     from backend.embedding.embedder import Embedder
@@ -261,6 +278,7 @@ async def health(request: Request):
             "ollama": ollama_status,
             "sqlite": sqlite_status,
             "faiss": faiss_status,
+            "faiss_vectors": faiss_tenants,
             "bm25": bm25_status,
             "embedder": embedder_status,
         },

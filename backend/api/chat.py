@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Header, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -31,9 +31,12 @@ def _remember_sources(state, session_id: str, sources: list, citations: list):
 
 
 @router.post("/")
-async def chat(req: ChatRequest, request: Request):
+async def chat(req: ChatRequest, request: Request,
+               x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id")):
     from backend.generation.pipeline import GenerationPipeline
     from backend.retrieval.hybrid_search import HybridSearch
+
+    tenant = x_tenant_id or "demo"
 
     if len(req.question) > 4096:
         return {
@@ -43,7 +46,7 @@ async def chat(req: ChatRequest, request: Request):
         }
 
     store = request.app.state.metadata_store
-    retriever = HybridSearch()
+    retriever = HybridSearch(tenant=tenant)
     pipeline = GenerationPipeline(
         retriever=retriever,
         metadata_store=store,

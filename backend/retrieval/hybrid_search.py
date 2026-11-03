@@ -30,22 +30,25 @@ def normalize_scores(scores: np.ndarray) -> np.ndarray:
 class HybridSearch:
     """Hybrid search combining BM25 and vector results with score normalization."""
     
-    def __init__(self, alpha: float = 0.7, top_k: int = 10, vector_store=None):
+    def __init__(self, alpha: float = 0.7, top_k: int = 10, vector_store=None,
+                 tenant: str = "demo"):
         """Initialize hybrid search.
 
         Args:
             alpha: Vector weight (default 0.7 per D-15)
             top_k: Number of results to return (default 10 per D-18)
             vector_store: 任意满足 VectorStore 接口的后端（faiss / pgvector / 测试桩）
+            tenant: 租户，决定用哪套向量索引与 BM25 倒排
         """
         self.alpha = alpha
         self.top_k = top_k
+        self.tenant = tenant
         if vector_store is None:
             from backend.retrieval.stores import build_vector_store
-            vector_store = build_vector_store()
+            vector_store = build_vector_store(tenant=tenant)
         self.vector_store = vector_store
         self.vector_search = getattr(vector_store, "inner", vector_store)
-        self.bm25 = BM25Retriever.get_instance()
+        self.bm25 = BM25Retriever.get_instance(tenant)
     
     def retrieve(
         self,

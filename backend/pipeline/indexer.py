@@ -18,16 +18,19 @@ from backend.models.document import Document
 class Indexer:
     def __init__(self, chunk_strategy: str = "by_section",
                  db_path: str = "data/metadata.db",
-                 index_path: str = "data/index/vector.faiss"):
+                 index_path: str | None = None,
+                 tenant: str = "demo"):
         self.chunk_strategy = chunk_strategy
         self.db_path = db_path
-        self.index_path = index_path
+        self.tenant = tenant
+        # 每个租户一个索引目录：文件层面的隔离，租户之间不可能误加载对方的索引
+        self.index_path = index_path or f"data/index/{tenant}/vector.faiss"
         self.parser = PDFParser()
         self.structure_extractor = StructureExtractor()
         self.chunker = LegalChunker(strategy=chunk_strategy)
         self.embedder = Embedder.get_instance()
-        self.vector_search = VectorSearch.get_instance()
-        self.bm25 = BM25Retriever.get_instance()
+        self.vector_search = VectorSearch.get_instance(tenant=tenant)
+        self.bm25 = BM25Retriever.get_instance(tenant=tenant)
         self.metadata_store = MetadataStore(db_path=db_path)
         # 重排器延迟到首次对话时再加载模型，避免启动即吃 90MB + 几秒
         self._reranker = None
@@ -74,6 +77,7 @@ class Indexer:
                 filename=filename,
                 file_path=file_path,
                 file_size=os.path.getsize(file_path),
+                tenant=self.tenant,
             )
             doc_id = self.metadata_store.insert_document(doc)
 
@@ -81,7 +85,7 @@ class Indexer:
         # 先清掉同一个 doc 的旧 chunk：重传同名文件时复用 doc_id，不先删就会
         # 在同一个文档下追加两套 chunk（旧 chunk 还留在 FAISS 里，检索出幽灵结果）。
         self._delete_chunks_of(doc_id)
-        self.metadata_store.insert_chunks(doc_id, chunks)
+        self.metadata_store.insert_chunks(doc_id, chunks, tenant=self.tenant)
         if definitions:
             self.metadata_store.insert_definitions(doc_id, definitions)
 
@@ -96,9 +100,9 @@ class Indexer:
         # 8. Add to FAISS
         self.vector_search.add(embeddings, chunk_ids)
 
-        # 9. Rebuild BM25 — rebuild from all chunks
-        all_texts = self.metadata_store.get_chunk_texts()
-        all_ids = [c.id for c in self.metadata_store.get_all_chunks()]
+        # 9. Rebuild BM25 — 只取本租户的 chunk
+        all_texts = self.metadata_store.get_chunk_texts(self.tenant)
+        all_ids = [c.id for c in self.metadata_store.get_all_chunks(self.tenant)]
         self.bm25.build_index(all_texts, all_ids)
 
         # 10. Save FAISS index（连同 position→chunk_id 映射一起落盘）
@@ -120,7 +124,7 @@ class Indexer:
         文档被删、重传、或者启动时发现索引与数据库不一致，都走这里。
         重建期间旧索引仍在服务，建好后一起切换，避免检索窗口为空。
         """
-        chunks = self.metadata_store.get_all_chunks()
+        chunks = self.metadata_store.get_all_chunks(self.tenant)
         if not chunks:
             self.vector_search.reset()
             self.bm25.reset()

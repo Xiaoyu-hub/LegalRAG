@@ -9,11 +9,13 @@ import numpy as np
 
 
 class VectorSearch:
-    _instance = None
+    # 按租户隔离的索引实例：一个进程里每个 tenant 一套 FAISS 索引
+    _instances: dict[str, "VectorSearch"] = {}
 
-    def __init__(self, dimension: int = 1024):
-        if VectorSearch._instance is not None:
+    def __init__(self, dimension: int = 1024, tenant: str = "demo"):
+        if tenant in VectorSearch._instances:
             raise RuntimeError("Use VectorSearch.get_instance() instead")
+        self.tenant = tenant
         self.dimension = dimension
         self._init_index()
         self.chunk_ids = []  # Maps FAISS index position -> chunk_id
@@ -24,12 +26,15 @@ class VectorSearch:
         self.index = faiss.IndexFlatIP(self.dimension)
 
     @classmethod
-    def get_instance(cls, dimension: int = None):
-        if cls._instance is None:
-            if dimension is None:
-                dimension = 1024  # BGE-large-en-v1.5 default
-            cls._instance = cls(dimension)
-        return cls._instance
+    def get_instance(cls, dimension: int = None, tenant: str = "demo"):
+        if tenant not in cls._instances:
+            cls._instances[tenant] = cls(dimension or 1024, tenant)
+        return cls._instances[tenant]
+
+    @classmethod
+    def drop_tenant(cls, tenant: str):
+        """丢弃某个租户的索引实例（测试与删除租户时用）。"""
+        cls._instances.pop(tenant, None)
 
     def add(self, embeddings: np.ndarray, chunk_ids: list[int] | None = None):
         """Add embeddings to the index.

@@ -19,11 +19,18 @@ class PgVectorStore:
 
     name = "pgvector"
 
-    def __init__(self, dsn: str, dimension: int = 1024, table: str | None = None):
+    def __init__(self, dsn: str, dimension: int = 1024, table: str | None = None,
+                 tenant: str = "demo"):
         self.dsn = dsn
         self.dimension = dimension
-        self.table = table or f"{TABLE_PREFIX}_{dimension}"
+        self.tenant = tenant
+        # 每个租户一张表：隔离最简单、不靠 WHERE 过滤，索引用得上、也不会串
+        self.table = table or f"{TABLE_PREFIX}_{self._safe(tenant)}_{dimension}"
         self._ensure_schema()
+
+    @staticmethod
+    def _safe(name: str) -> str:
+        return "".join(ch if ch.isalnum() else "_" for ch in name.lower())[:32]
 
     # ── 内部 ────────────────────────────────────────────────────────────
     def _connect(self):
@@ -92,7 +99,7 @@ class PgVectorStore:
     def reset(self, dimension: int | None = None):
         if dimension is not None and dimension != self.dimension:
             self.dimension = dimension
-            self.table = f"{TABLE_PREFIX}_{dimension}"
+            self.table = f"{TABLE_PREFIX}_{self._safe(self.tenant)}_{dimension}"
             self._ensure_schema()
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(f"TRUNCATE {self.table}")

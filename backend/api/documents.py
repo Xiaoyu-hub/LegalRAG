@@ -7,7 +7,7 @@ Per D-06: Unified response wrapper: {"status": "ok"|"error", "data": ..., "error
 import logging
 import os
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, UploadFile
 
 from backend.pipeline.indexer import Indexer
 from backend.models.document import Document
@@ -40,7 +40,8 @@ def _validate_filename(filename: str) -> str:
 # ── Background Task ────────────────────────────────────────────────────────
 
 
-def process_document_task(doc_id: int, file_path: str, app_state, rebuild: bool = False):
+def process_document_task(doc_id: int, file_path: str, app_state, rebuild: bool = False,
+                          tenant: str = "demo"):
     """Run full indexing pipeline as a background task.
 
     On success: marks status as "ready".
@@ -49,13 +50,14 @@ def process_document_task(doc_id: int, file_path: str, app_state, rebuild: bool 
     rebuild=True 时在索引完后从数据库全量重建 FAISS + BM25：替换/删除文档后，
     旧 chunk 的向量还留在索引里，不清掉会检索到已删除的条文。
     """
-    logger.info("Starting background processing for doc_id=%d, file_path=%s", doc_id, file_path)
+    logger.info("Starting background processing for doc_id=%d, file_path=%s, tenant=%s",
+                doc_id, file_path, tenant)
     try:
-        indexer: Indexer = app_state.indexer
+        indexer: Indexer = app_state.indexers[tenant]
         indexer.process_document(file_path, doc_id=doc_id)
         if rebuild:
             n = indexer.rebuild_all()
-            logger.info("Rebuilt indexes after replacement: %d chunks", n)
+            logger.info("[%s] Rebuilt indexes after replacement: %d chunks", tenant, n)
         app_state.processing_status[doc_id] = "ready"
         logger.info("Document %d processed successfully", doc_id)
     except Exception as exc:
@@ -71,6 +73,7 @@ async def upload_document(
     file: UploadFile,
     background_tasks: BackgroundTasks,
     request: Request,
+    x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),
 ):
     """Upload a PDF document for parsing and indexing.
 
@@ -90,34 +93,38 @@ async def upload_document(
         return _unified_response("error", None, exc.detail)
 
     # --- Read content and enforce size limit ---
+    tenant = x_tenant_id or "demo"
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
         return _unified_response("error", None, "File size exceeds 50 MB limit")
 
-    # --- Save file to disk ---
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    file_path = os.path.join(UPLOAD_DIR, filename)
+    # --- 文件按租户分目录保存，同名文件不会互相覆盖 ---
+    upload_dir = os.path.join(UPLOAD_DIR, tenant)
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, filename)
     with open(file_path, "wb") as f:
         f.write(content)
 
     # --- Dedup: 同名视为「替换」，先删旧记录（CASCADE 清 chunks）再当新文档 ---
     metadata_store: MetadataStore = request.app.state.metadata_store
-    existing = metadata_store.get_document_by_filename(filename)
+    existing = metadata_store.get_document_by_filename(filename, tenant=tenant)
     replaced = False
     if existing is not None:
         # 文件已在上面覆盖写入，旧路径就是同一个 path
         metadata_store.delete_document(existing.id)
         request.app.state.processing_status.pop(existing.id, None)
         replaced = True
-        logger.info("Replaced existing document %d (%s)", existing.id, filename)
+        logger.info("[%s] Replaced existing document %d (%s)", tenant, existing.id, filename)
 
-    doc = Document(filename=filename, file_path=file_path, file_size=len(content))
+    doc = Document(filename=filename, file_path=file_path, file_size=len(content),
+                   tenant=tenant)
     doc_id = metadata_store.insert_document(doc)
 
     # --- Launch background indexing ---
+    request.app.get_indexer(tenant)  # 确保该租户的 Indexer 已建
     request.app.state.processing_status[doc_id] = "processing"
     background_tasks.add_task(
-        process_document_task, doc_id, file_path, request.app.state, replaced
+        process_document_task, doc_id, file_path, request.app.state, replaced, tenant
     )
 
     return _unified_response("ok", {
@@ -129,11 +136,13 @@ async def upload_document(
 
 
 @router.get("/")
-async def list_documents(request: Request):
-    """List all uploaded documents with status and chunk count."""
+async def list_documents(request: Request,
+                        x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id")):
+    """List all uploaded documents with status and chunk count（仅当前租户）。"""
+    tenant = x_tenant_id or "demo"
     metadata_store: MetadataStore = request.app.state.metadata_store
     documents = []
-    for doc in metadata_store.get_all_documents():
+    for doc in metadata_store.get_all_documents(tenant):
         doc_dict = {
             "id": doc.id,
             "filename": doc.filename,
@@ -150,10 +159,12 @@ async def list_documents(request: Request):
 
 
 @router.get("/{doc_id}")
-async def get_document(doc_id: int, request: Request):
+async def get_document(doc_id: int, request: Request,
+                       x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id")):
     """Get a single document by ID with status and chunk count."""
+    tenant = x_tenant_id or "demo"
     metadata_store: MetadataStore = request.app.state.metadata_store
-    doc = metadata_store.get_document(doc_id)
+    doc = metadata_store.get_document(doc_id, tenant=tenant)
     if doc is None:
         raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
     return _unified_response("ok", {
@@ -169,10 +180,12 @@ async def get_document(doc_id: int, request: Request):
 
 
 @router.get("/{doc_id}/status")
-async def get_document_status(doc_id: int, request: Request):
+async def get_document_status(doc_id: int, request: Request,
+                              x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id")):
     """Poll processing status for a document (D-05)."""
+    tenant = x_tenant_id or "demo"
     metadata_store: MetadataStore = request.app.state.metadata_store
-    doc = metadata_store.get_document(doc_id)
+    doc = metadata_store.get_document(doc_id, tenant=tenant)
     if doc is None:
         raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
     status = request.app.state.processing_status.get(doc_id, "unknown")
@@ -184,10 +197,12 @@ async def get_document_status(doc_id: int, request: Request):
 
 
 @router.get("/{doc_id}/chunks")
-async def get_document_chunks(doc_id: int, request: Request):
+async def get_document_chunks(doc_id: int, request: Request,
+                              x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id")):
     """Get all chunks for a document preview (D-12)."""
+    tenant = x_tenant_id or "demo"
     metadata_store: MetadataStore = request.app.state.metadata_store
-    doc = metadata_store.get_document(doc_id)
+    doc = metadata_store.get_document(doc_id, tenant=tenant)
     if doc is None:
         raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
     chunks = metadata_store.get_chunks_by_doc_id(doc_id)
