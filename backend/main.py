@@ -223,6 +223,19 @@ app.include_router(gateway_router, prefix="/api/v1")
 # ── Health Endpoint (D-07) ─────────────────────────────────────────────────
 
 
+# ── Prometheus 指标出口（D-07 之外单独一个路径，方便 scrape 配置）──
+
+
+@app.get("/metrics")
+async def metrics():
+    """暴露 Prometheus 指标。不带 /api/v1 前缀：Prometheus 默认就这么配。"""
+    from fastapi.responses import Response
+
+    from backend.observability import render
+
+    return Response(content=render(), media_type="text/plain; version=0.0.4")
+
+
 @app.get("/api/v1/health")
 async def health(request: Request):
     """Check system health: Ollama, SQLite, FAISS, BM25, Embedder."""

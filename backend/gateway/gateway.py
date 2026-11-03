@@ -76,12 +76,16 @@ class LLMGateway:
         if tenant.rpm_limit:
             used = self.metering.recent_calls(tenant.id, window_sec=60)
             if used >= tenant.rpm_limit:
+                from backend.observability import record_rejection
+                record_rejection(tenant.id, "rpm")
                 raise QuotaExceeded(tenant.id, f"rpm {used}/{tenant.rpm_limit}", 60)
 
         if tenant.monthly_budget_usd is not None:
             spent = self.metering.month_cost(tenant.id)
             if spent >= tenant.monthly_budget_usd:
                 # 预算耗尽：退避到月初，这里给 3600 让调用方别立刻重试
+                from backend.observability import record_rejection
+                record_rejection(tenant.id, "budget")
                 raise QuotaExceeded(
                     tenant.id,
                     f"monthly budget {spent:.6f}/{tenant.monthly_budget_usd}",
@@ -124,12 +128,24 @@ class LLMGateway:
                 resp: ProviderResponse = provider.generate(system_prompt, user_prompt)
             except Exception as exc:
                 last_error = exc
+                from backend.observability import record_error
+                record_error(tenant.id, candidate, provider_name or "unknown")
                 logger.warning("后端 %s 调用 %s 失败：%s", provider_name, candidate, exc)
                 continue
 
             latency_ms = (time.time() - start) * 1000
             cost = self.pricing.cost(candidate, resp.prompt_tokens, resp.completion_tokens)
             fallback_from = primary if candidate != primary else ""
+            from backend.observability import record_success
+            record_success(
+                tenant=tenant.id,
+                model=candidate,
+                provider=provider_name or "unknown",
+                prompt_tokens=resp.prompt_tokens,
+                completion_tokens=resp.completion_tokens,
+                cost_usd=cost,
+                latency_sec=latency_ms / 1000.0,
+            )
             self.metering.record(UsageRecord(
                 tenant=tenant.id,
                 model=candidate,
@@ -186,6 +202,16 @@ class LLMGateway:
         prompt_tokens = count_tokens(system_prompt) + count_tokens(user_prompt)
         completion_tokens = count_tokens(content)
         cost = self.pricing.cost(chosen, prompt_tokens, completion_tokens)
+        from backend.observability import record_success
+        record_success(
+            tenant=tenant.id,
+            model=chosen,
+            provider=getattr(provider, "name", "unknown"),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            cost_usd=cost,
+            latency_sec=(time.time() - start),
+        )
         self.metering.record(UsageRecord(
             tenant=tenant.id,
             model=chosen,
