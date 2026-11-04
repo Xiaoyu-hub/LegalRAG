@@ -75,3 +75,25 @@ jobs:
           path: |
             data/e2e_tmp/*.log
           if-no-files-found: ignore
+
+  mcp:
+    name: mcp-server build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - name: Install
+        working-directory: mcp-server
+        run: npm ci
+
+      # 只验能编译（strict + noUncheckedIndexedAccess）；冒烟需要活后端，不进 CI
+      - name: Type-check and build
+        working-directory: mcp-server
+        run: npm run build

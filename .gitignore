@@ -19,3 +19,6 @@ data/usage.db
 data/index/*/
 data/usage*.db
 data/e2e_tmp/
+
+mcp-server/node_modules/
+mcp-server/dist/
