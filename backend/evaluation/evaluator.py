@@ -1,12 +1,9 @@
-"""Evaluation framework for retrieval quality metrics.
-
-Per D-20: Precision@5 and Recall@5 standard metrics.
-Per D-21: Outputs JSON results for tracking over time.
-
-Per architecture.md section 3.5:
-- Precision@5: top-5 results that are relevant / 5
-- Recall@5: top-5 results that are relevant / total relevant in corpus
-"""
+"""检索质量评测。
+- D-20：Precision@5 与 Recall@5
+- D-21：结果落 JSON 以便追踪
+口径（architecture.md 3.5 节）：
+- Precision@5 = 前 5 条里相关的条数 / 5
+- Recall@5 = 前 5 条里相关的条数 / 全库里相关的总条数"""
 
 import json
 import datetime
@@ -15,40 +12,36 @@ from backend.evaluation.test_queries import TEST_QUERIES
 
 
 class Evaluator:
-    """Evaluates retrieval quality using Precision@K and Recall@K."""
+    """用 Precision@K 与 Recall@K 评估检索质量。"""
 
     def __init__(self, retrieve_fn: Callable = None,
                  generation_pipeline: Optional[object] = None,
                  judge: Optional[object] = None):
-        """Initialize evaluator with optional retrieval, generation, and judge.
-
-        Args:
-            retrieve_fn: Function that takes (query, top_k) and returns
-                       list of dicts with 'chunk' key containing Chunk object
-            generation_pipeline: Object with .answer(query) method returning
-                               (answer_text, citations_list) tuple
-            judge: RelevanceJudge instance for scoring answer quality
-        """
+        """初始化评测器（检索、生成、评委三个依赖都可选）。
+        参数：
+        - retrieve_fn：接收 (query, top_k)，返回若干 dict，每个 dict 的 'chunk' 键是 Chunk 对象
+        - generation_pipeline：有 .answer(query) 方法，返回 (答案文本, 引用列表)
+        - judge：RelevanceJudge 实例，用来给答案质量打分"""
         self.retrieve_fn = retrieve_fn
         self.generation_pipeline = generation_pipeline
         self.judge = judge
 
     @staticmethod
     def precision_at_k(retrieved_ids: set, relevant_ids: set, k: int) -> float:
-        """Precision@K = relevant retrieved / K."""
+        """Precision@K = 召回的相关的条数 / K。"""
         if k == 0:
             return 0.0
         return len(retrieved_ids & relevant_ids) / k
 
     @staticmethod
     def recall_at_k(retrieved_ids: set, relevant_ids: set, k: int) -> float:
-        """Recall@K = relevant retrieved / total relevant."""
+        """Recall@K = 召回的相关的条数 / 全库相关总数。"""
         if len(relevant_ids) == 0:
-            return 0.0  # Division by zero guard
+            return 0.0  # 兜住分母为 0 的情况
         return len(retrieved_ids & relevant_ids) / len(relevant_ids)
 
     def evaluate_query(self, query: str, relevant_ids: set, k: int = 5) -> dict:
-        """Evaluate a single query, return metric dict."""
+        """评估单条查询，返回指标 dict。"""
         if self.retrieve_fn is None:
             raise RuntimeError("retrieve_fn not set")
 
@@ -66,15 +59,12 @@ class Evaluator:
 
     def evaluate_all(self, queries: list[dict] = None, k: int = 5,
                      output_path: str = None) -> dict:
-        """Evaluate all test queries, return aggregate results.
-
-        Args:
-            queries: List of query dicts (default: TEST_QUERIES)
-            k: Top-K value
-            output_path: Optional path to write JSON results
-        Returns:
-            Dict with precision@k, recall@k, per_query breakdown
-        """
+        """跑完整套测试查询，返回汇总结果。
+        参数：
+        - queries：查询列表（默认用 TEST_QUERIES）
+        - k：取前 K 条
+        - output_path：可选，把 JSON 结果写到这个路径
+        返回：含 precision@k、recall@k 与逐条明细的 dict"""
         if queries is None:
             queries = TEST_QUERIES
 
@@ -106,7 +96,7 @@ class Evaluator:
 
     @staticmethod
     def format_results(results: dict) -> str:
-        """Format evaluation results as a readable string."""
+        """把评测结果格式化成可读文本。"""
         lines = [
             "=" * 50,
             "Retrieval Evaluation Results",
@@ -124,10 +114,7 @@ class Evaluator:
 
     @staticmethod
     def citation_precision(citations: list) -> float:
-        """Compute citation precision = valid citations / total citations.
-
-        Returns 1.0 for empty list (no citations means no incorrect ones).
-        """
+        """计算引用准确率 = 有效引用数 / 引用总数。空列表返回 1.0（一条引用都没有，也就没有错的）。"""
         if not citations:
             return 1.0
         valid = sum(1 for c in citations if c.valid)
@@ -135,18 +122,11 @@ class Evaluator:
 
     def evaluate_generation(self, queries: list[dict] = None,
                             output_path: str = None) -> dict:
-        """Evaluate generation quality across test queries.
-
-        Runs queries through the generation pipeline (if available),
-        computes citation precision, and optionally scores with RelevanceJudge.
-
-        Args:
-            queries: List of query dicts (default: TEST_QUERIES)
-            output_path: Optional path to write JSON results
-
-        Returns:
-            Dict with average_citation_precision, per_query breakdown
-        """
+        """评估生成质量：把测试查询跑一遍生成链路（可用时），算引用准确率，需要时再交 RelevanceJudge 打分。
+        参数：
+        - queries：查询列表（默认 TEST_QUERIES）
+        - output_path：可选，JSON 落盘路径
+        返回：含平均引用准确率与逐条明细的 dict"""
         if queries is None:
             queries = TEST_QUERIES
 
@@ -232,7 +212,7 @@ class Evaluator:
 
     @staticmethod
     def format_generation_results(results: dict) -> str:
-        """Format generation evaluation results as a readable string."""
+        """把生成质量评测结果格式化成可读文本。"""
         lines = [
             "=" * 60,
             "Generation Evaluation Results",

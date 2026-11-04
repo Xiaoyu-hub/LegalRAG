@@ -1,11 +1,8 @@
-"""Hybrid search combining BM25 and vector search with score normalization.
-
-Per D-15: Alpha weighting 0.7 vector / 0.3 BM25.
-Per D-18: Return top-10 before reranking.
-
-CRITICAL (Pitfall 1): BM25 and FAISS scores are on incompatible scales.
-Min-max normalize BOTH per query before weighted combination.
-"""
+"""混合检索：BM25 与向量两路召回，再做分数归一化后融合。
+- D-15：权重 0.7 向量 / 0.3 BM25
+- D-18：重排前先取 10 条候选（重排池要大过最终条数）
+关键（第 1 个坑）：BM25 分数无上界、向量余弦在 [-1,1]，两者量纲不可比。
+每条 query 都要**两路各自**做 min-max 归一化，然后才能加权相加。"""
 import logging
 
 import numpy as np
@@ -17,10 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_scores(scores: np.ndarray) -> np.ndarray:
-    """Min-max normalize scores to [0, 1].
-    
-    Handles edge case where all scores are equal (returns zeros).
-    """
+    """把分数 min-max 归一化到 [0,1]。全部相等时返回全 0（避免除零）。"""
     min_s, max_s = scores.min(), scores.max()
     if max_s == min_s:
         return np.zeros_like(scores, dtype=np.float32)
@@ -28,7 +22,7 @@ def normalize_scores(scores: np.ndarray) -> np.ndarray:
 
 
 class HybridSearch:
-    """Hybrid search combining BM25 and vector results with score normalization."""
+    """混合检索：BM25 与向量结果归一化后融合。"""
     
     def __init__(self, alpha: float = 0.7, top_k: int = 10, vector_store=None,
                  tenant: str = "demo"):
@@ -90,17 +84,13 @@ class HybridSearch:
         alpha: float | None = None,
         top_k: int | None = None
     ) -> list[tuple[int, float]]:
-        """Hybrid search: vector + BM25 with min-max normalized score fusion.
-        
-        Args:
-            query_vec: L2-normalized query embedding (1024,)
-            tokenized_query: Tokenized query for BM25
-            alpha: Vector weight (default: self.alpha)
-            top_k: Number of results to return (default: self.top_k)
-            
-        Returns:
-            List of (chunk_index, hybrid_score) tuples sorted by score descending
-        """
+        """混合检索：向量 + BM25，分数先 min-max 归一化再融合。
+        参数：
+        - query_vec：L2 归一化后的查询向量（1024 维）
+        - tokenized_query：BM25 用的分词结果
+        - alpha：向量权重（默认 self.alpha）
+        - top_k：返回条数（默认 self.top_k）
+        返回：(chunk_id, 融合分数) 列表，按分数降序"""
         alpha = alpha if alpha is not None else self.alpha
         k = top_k if top_k is not None else self.top_k
 

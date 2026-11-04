@@ -1,9 +1,7 @@
-"""Documents API router — upload, list, status, chunks.
-
-Per D-01: Routes organized by resource.
-Per D-05: Async document indexing via BackgroundTasks + polling endpoint.
-Per D-06: Unified response wrapper: {"status": "ok"|"error", "data": ..., "error": null|str}.
-"""
+"""文档接口路由：上传、列表、状态、分段预览。
+- D-01：路由按资源拆分
+- D-05：索引用 BackgroundTasks 异步跑，配一个轮询状态的端点
+- D-06：统一响应格式 {"status": "ok"|"error", "data": ..., "error": null|str}"""
 import logging
 import os
 
@@ -18,27 +16,27 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
-# ── Constants ──────────────────────────────────────────────────────────────
+# ── 常量 ──
 
 UPLOAD_DIR = "data/documents"
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB (T-3-01)
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB 上限（T-3-01）
 
-# ── Helpers ────────────────────────────────────────────────────────────────
+# ── 工具函数 ──
 
 
 def _unified_response(status: str, data, error: str = None) -> dict:
-    """Unified response wrapper per D-06."""
+    """按 D-06 的统一响应包装。"""
     return {"status": status, "data": data, "error": error}
 
 
 def _validate_filename(filename: str) -> str:
-    """Sanitize and validate filename per T-3-05 (path traversal prevention)."""
+    """清洗并校验文件名（T-3-05：防目录穿越）。"""
     if ".." in filename or "/" in filename or "\\" in filename:
         raise HTTPException(status_code=400, detail="Invalid filename: path traversal detected")
     return os.path.basename(filename)
 
 
-# ── Background Task ────────────────────────────────────────────────────────
+# ── 后台任务 ──
 
 
 def process_document_task(doc_id: int, file_path: str, app_state, rebuild: bool = False,
@@ -66,7 +64,7 @@ def process_document_task(doc_id: int, file_path: str, app_state, rebuild: bool 
         logger.error("Failed to process document %d: %s", doc_id, exc, exc_info=True)
 
 
-# ── Endpoints ──────────────────────────────────────────────────────────────
+# ── 接口 ──
 
 
 @router.post("/upload")
@@ -76,24 +74,21 @@ async def upload_document(
     request: Request,
     tenant: str = Depends(resolve_tenant),
 ):
-    """Upload a PDF document for parsing and indexing.
-
-    Threat mitigations:
-      - T-3-01: Validate content_type is "application/pdf"; 50 MB limit.
-      - T-3-05: Sanitise filename via os.path.basename(); reject path traversal.
-    """
-    # --- Validate content type (T-3-01) ---
+    """上传 PDF 并触发解析与索引。威胁缓解：
+    - T-3-01：校验 content_type 为 application/pdf，限制 50 MB
+    - T-3-05：用 os.path.basename() 清洗文件名，拒绝路径穿越"""
+    # --- 校验 content_type（T-3-01）---
     content_type = file.content_type or ""
     if not content_type.startswith("application/pdf"):
         return _unified_response("error", None, "Only PDF files are supported")
 
-    # --- Validate and sanitise filename (T-3-05) ---
+    # --- 校验并清洗文件名（T-3-05）---
     try:
         filename = _validate_filename(file.filename or "document.pdf")
     except HTTPException as exc:
         return _unified_response("error", None, exc.detail)
 
-    # --- Read content and enforce size limit ---
+    # --- 读取内容并检查大小上限 ---
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
         return _unified_response("error", None, "File size exceeds 50 MB limit")
@@ -120,7 +115,7 @@ async def upload_document(
                    tenant=tenant)
     doc_id = metadata_store.insert_document(doc)
 
-    # --- Launch background indexing ---
+    # --- 启动后台索引 ---
     request.app.get_indexer(tenant)  # 确保该租户的 Indexer 已建
     request.app.state.processing_status[doc_id] = "processing"
     background_tasks.add_task(

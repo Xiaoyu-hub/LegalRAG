@@ -1,10 +1,8 @@
-"""Streamlit Documents page — upload, list, and manage PDF documents.
-
-Per UI-SPEC Page 1:
-  - States: Empty, Uploading, Upload error, List, Processing.
-  - Copywriting from UI-SPEC copywriting contract.
-  - Status badges with UI-SPEC color tokens.
-"""
+"""文档页：上传、列表、管理 PDF。
+按设计规范第 1 页：
+- 状态：空、上传中、上传失败、列表、处理中
+- 文案按规范里的文案表
+- 状态徽章用规范规定的颜色"""
 import os
 import time
 
@@ -19,7 +17,7 @@ st.title("Documents")
 
 
 def fetch_documents():
-    """Fetch all documents from the API."""
+    """从接口拉全部文档。"""
     try:
         resp = requests.get(f"{API_BASE}/api/v1/documents/", timeout=5)
         if resp.status_code == 200:
@@ -30,7 +28,7 @@ def fetch_documents():
 
 
 def render_status_badge(status: str) -> str:
-    """Render a coloured HTML status badge."""
+    """渲染一个带颜色的状态徽章。"""
     if status == "ready":
         return '<span class="status-ready">\u2705 Ready</span>'
     elif status == "processing":
@@ -41,11 +39,11 @@ def render_status_badge(status: str) -> str:
         return f'<span class="status-error">\u2753 {status}</span>'
 
 
-# ── State ──────────────────────────────────────────────────────────────────
+# ── 状态 ──
 
 documents = fetch_documents()
 
-# ── Empty State ────────────────────────────────────────────────────────────
+# ── 空状态 ──
 
 if documents is None:
     st.error(
@@ -61,7 +59,7 @@ elif len(documents) == 0:
         unsafe_allow_html=True,
     )
 
-# ── Upload Widget ──────────────────────────────────────────────────────────
+# ── 上传控件 ──
 
 uploaded_file = st.file_uploader(
     "Upload Document", type=["pdf"], accept_multiple_files=False
@@ -80,7 +78,7 @@ if uploaded_file is not None:
                 data = resp.json()
                 if data.get("status") == "ok":
                     doc_id = data["data"]["document_id"]
-                    # Poll until processing completes
+                    # 轮询直到处理完成
                     while True:
                         poll_resp = requests.get(
                             f"{API_BASE}/api/v1/documents/{doc_id}/status",
@@ -116,7 +114,7 @@ if uploaded_file is not None:
                 "Please check the file and try again."
             )
 
-# ── Document List ──────────────────────────────────────────────────────────
+# ── 文档列表 ──
 
 documents = fetch_documents()
 if documents and len(documents) > 0:
@@ -131,27 +129,27 @@ if documents and len(documents) > 0:
 
         with st.container():
             cols = st.columns([1, 3, 2, 2, 1])
-            # Icon column
+            # 图标列
             cols[0].markdown("\ud83d\udcc4")
-            # Filename
+            # 文件名
             cols[1].markdown(
                 f'<div class="doc-card-title">{filename}</div>',
                 unsafe_allow_html=True,
             )
-            # Date
+            # 日期
             cols[2].markdown(
                 f'<div class="doc-card-meta">{created_at}</div>',
                 unsafe_allow_html=True,
             )
-            # Chunk count
+            # 分段数
             cols[3].markdown(
                 f'<div class="doc-card-meta">{chunk_count} chunks indexed</div>',
                 unsafe_allow_html=True,
             )
-            # Status badge
+            # 状态徽章
             cols[4].markdown(status_html, unsafe_allow_html=True)
 
-            # Click to select
+            # 点击选中
             if cols[0].button("\ud83d\udccb", key=f"select_{doc_id}"):
                 st.session_state.selected_doc_id = doc_id
                 st.session_state.selected_doc_name = filename

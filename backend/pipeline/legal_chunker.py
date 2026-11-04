@@ -4,13 +4,11 @@ from backend.models.chunk import Chunk
 
 
 class LegalChunker:
-    """Create legal-aware chunks preserving document hierarchy metadata.
-
-    Per D-07: Default strategy is 'by_section' for granular citation accuracy.
-    Per D-08: 'by_article' strategy supported as configurable alternative.
-    Per D-09: Full hierarchy preserved: article, section, subsection, parent_article, title.
-    Per D-10: Chunk size target 512-1024 tokens (via section/article boundaries).
-    """
+    """按法条结构分块，并保留文档层级元数据。
+    - D-07：默认 by_section，切得更细，引用能精确到小节
+    - D-08：另支持 by_article，可配置切换
+    - D-09：完整保留层级：条、小节、子项、父级条号、标题
+    - D-10：块大小目标 512–1024 token（靠条/小节边界自然切分）"""
 
     def __init__(self, strategy: str = "by_section"):
         if strategy not in ("by_section", "by_article"):
@@ -18,17 +16,13 @@ class LegalChunker:
         self.strategy = strategy
 
     def chunk(self, structure: list[dict], text: str = "") -> list[Chunk]:
-        """Convert structure hierarchy into a list of Chunk dataclass instances."""
+        """把结构层级列表转成一批 Chunk 数据对象。"""
         if self.strategy == "by_section":
             return self._chunk_by_section(structure)
         return self._chunk_by_article(structure)
 
     def _chunk_by_section(self, structure: list[dict]) -> list[Chunk]:
-        """Each Section becomes a chunk with its subsections and body text.
-
-        The parent article's heading text is included as context at the start
-        of each section's content.
-        """
+        """每个 Section 生成一个 chunk，把它的子项与正文都装进去；同时把父级 Article 的标题带回块首，作为上下文。"""
         chunks: list[Chunk] = []
         current_section_data: Optional[dict] = None
         current_article_text: str = ""
@@ -75,7 +69,7 @@ class LegalChunker:
         return chunks
 
     def _chunk_by_article(self, structure: list[dict]) -> list[Chunk]:
-        """Each Article becomes a chunk with all its sections and subsections."""
+        """每个 Article 生成一个 chunk，把其下所有小节与子项都装进去。"""
         chunks: list[Chunk] = []
         current_article_data: Optional[dict] = None
         article_texts: list[str] = []
@@ -103,7 +97,7 @@ class LegalChunker:
 
     def _make_chunk(self, section_element: dict, texts: list[str],
                     chunk_index: int) -> Chunk:
-        """Build a Chunk from a section's worth of content."""
+        """用一个小节的内容组装 Chunk。"""
         return Chunk(
             chunk_index=chunk_index,
             text="\n".join(texts),
@@ -116,7 +110,7 @@ class LegalChunker:
 
     def _make_article_chunk(self, article_element: dict, texts: list[str],
                             chunk_index: int) -> Chunk:
-        """Build a Chunk from an article's worth of content."""
+        """用一整条的内容组装 Chunk。"""
         return Chunk(
             chunk_index=chunk_index,
             text="\n".join(texts),

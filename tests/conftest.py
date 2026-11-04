@@ -1,4 +1,4 @@
-"""Shared test fixtures for the ingestion pipeline tests."""
+"""入库流水线测试共用的 fixture。"""
 
 from pathlib import Path
 import pytest
@@ -6,18 +6,15 @@ import pytest
 
 @pytest.fixture
 def sample_pdf_text() -> str:
-    """Return the content of the sample legal document."""
+    """返回样例法条文档的全文。"""
     fixture_path = Path(__file__).parent.parent / "data" / "test" / "sample_legal.txt"
     return fixture_path.read_text(encoding="utf-8")
 
 
 @pytest.fixture
 def sample_pdf_path(tmp_path) -> Path:
-    """Write the sample legal text to a temp .txt file for structure testing.
-
-    In Task 1 there is no real PDF — the test fixture text is used directly.
-    This fixture provides a temp file path for modules that need file input.
-    """
+    """把样例法条文本写进临时 .txt，供结构抽取测试用。
+    当时还没有真 PDF，所以直接用 fixture 文本；这个 fixture 只是给「需要文件路径」的模块一个临时文件。"""
     fixture_path = Path(__file__).parent.parent / "data" / "test" / "sample_legal.txt"
     text = fixture_path.read_text(encoding="utf-8")
     tmp_file = tmp_path / "sample_legal.txt"
@@ -27,5 +24,5 @@ def sample_pdf_path(tmp_path) -> Path:
 
 @pytest.fixture
 def temp_db_path(tmp_path) -> str:
-    """Return a temporary SQLite database path for MetadataStore tests."""
+    """给元数据存储测试返回一个临时 SQLite 路径。"""
     return str(tmp_path / "test_metadata.db")

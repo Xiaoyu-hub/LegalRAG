@@ -1,7 +1,4 @@
-"""BM25 keyword retrieval using rank_bm25.
-
-Per D-16: Use rank_bm25 library for keyword retrieval.
-"""
+"""BM25 关键词检索（用 rank_bm25 库）。D-16：关键词通路选它，不自己实现。"""
 import re
 import numpy as np
 from rank_bm25 import BM25Okapi
@@ -27,27 +24,23 @@ class BM25Retriever:
 
     @staticmethod
     def tokenize(text: str) -> list[str]:
-        """Tokenize text for BM25. Lowercase, split on word boundaries.
-        Per RESEARCH.md Pitfall 5: Define a single tokenize() used for both
-        corpus building and querying. Use same tokenizer consistently.
-        """
+        """BM25 分词：转小写，按词边界切。
+        RESEARCH.md 第 5 个坑写得很明确——建库与查询必须共用同一个 tokenize()，否则分词口径不一致，关键词通路会静默失效。"""
         text = text.lower()
         return re.findall(r'\w+', text)
 
     def build_index(self, texts: list[str], chunk_ids: list[int] | None = None):
-        """Build BM25 index from chunk texts.
-
-        Args:
-            texts: List of chunk text strings
-            chunk_ids: Corresponding chunk IDs (default: range(len(texts)))
-        """
+        """用一批 chunk 文本建 BM25 索引。
+        参数：
+        - texts：文本列表
+        - chunk_ids：对应的业务主键（默认 range(len(texts))）"""
         self.corpus = texts
         self.chunk_ids = chunk_ids if chunk_ids is not None else list(range(len(texts)))
         tokenized_corpus = [self.tokenize(t) for t in texts]
         self.bm25 = BM25Okapi(tokenized_corpus)
 
     def search(self, query: str, n: int = 10) -> list[tuple[int, float]]:
-        """Search BM25 index, return top-n (chunk_id, score) pairs."""
+        """检索 BM25，返回若干 (chunk_id, score)，按分数降序。"""
         if self.bm25 is None:
             raise RuntimeError("BM25 index not built. Call build_index() first.")
         tokenized_query = self.tokenize(query)
@@ -58,13 +51,13 @@ class BM25Retriever:
         return [(self.chunk_ids[i], float(scores[i])) for i in top_indices]
 
     def get_scores(self, tokenized_query: list[str]) -> np.ndarray:
-        """Get BM25 scores for all documents. Used by hybrid search."""
+        """取全库每个文档的 BM25 分数，供混合检索使用。"""
         if self.bm25 is None:
             raise RuntimeError("BM25 index not built.")
         return np.array(self.bm25.get_scores(tokenized_query))
 
     def reset(self):
-        """Clear the index. Used when re-indexing."""
+        """清空索引，重建时用。"""
         self.bm25 = None
         self.chunk_ids = []
         self.corpus = []

@@ -6,7 +6,7 @@ from backend.models.citation import Citation
 
 logger = logging.getLogger(__name__)
 
-# Matches [Article X, Section Y] or [Article X] (article-only)
+# 匹配 [Article X, Section Y]，也兼容只写条号 [Article X]
 CITATION_PATTERN = re.compile(
     r"\[(Article)\s+((?:[IVXLCDM]+|\d+))"
     r"(?:,\s*Section\s+(\d+(?:\([a-z]\))?))?"
@@ -45,18 +45,18 @@ class CitationBuilder:
                 valid_pairs.add((article_clean, section_clean))
 
         for citation in citations:
-            # Level 1: Exact match (article + section pair)
+            # 第一层：精确匹配（条号 + 小节号成对相同）
             if (citation.article, citation.section) in valid_pairs:
                 citation.valid = True
                 continue
 
-            # Level 2: Partial match — citation text substring in chunk metadata
+            # 第二层：宽松匹配——引用文本作为子串出现在片段元数据里
             citation.valid = self._partial_match(citation, chunks)
 
         return citations
 
     def _partial_match(self, citation: Citation, chunks: list) -> bool:
-        """Check if citation text appears as substring in any chunk's metadata."""
+        """检查引用文本是否出现在某个片段的元数据里（宽松匹配）。"""
         citation_lower = citation.text.lower()
         for chunk in chunks:
             chunk_meta = " ".join(filter(None, [

@@ -3,19 +3,16 @@ from typing import Optional
 
 
 class StructureExtractor:
-    """Extract legal document structure from plain text using regex patterns.
-
-    Per D-04: Regex-based pattern matching for legal document structure.
-    Per D-05: Patterns support Article [IVX]+/\d+, Section \d+, ([a-z])/(\d+) subsections.
-    Per D-06: Extracts legal term definitions via 'term' means... patterns.
-
-    Output hierarchy elements have:
-    - type: "article" | "section" | "subsection" | "body_text"
-    - number/label: identifier for the element
-    - text: full line text
-    - parent_article: article number this element belongs to (None for articles)
-    - parent_section: section number this element belongs to (None for articles/sections)
-    """
+    """用正则从纯文本里抽出法条结构。
+    - D-04：基于正则识别结构
+    - D-05：支持 Article 罗马数字/阿拉伯数字、Section 数字、(a)/(1) 形式的子项
+    - D-06：识别「某术语 means …」这类定义句
+    输出元素字段：
+    - type: article | section | subsection | body_text
+    - number/label：该元素的编号
+    - text：整行原文
+    - parent_article：所属条号（article 本身为 None）
+    - parent_section：所属小节号（article/section 自身为 None）"""
 
     PATTERNS = {
         "article": re.compile(r"^(Article)\s+((?:[IVXLCDM]+|\d+))", re.IGNORECASE),
@@ -26,12 +23,7 @@ class StructureExtractor:
     }
 
     def extract(self, text: str) -> list[dict]:
-        """Process text line-by-line and return hierarchy list.
-
-        Each dict contains:
-        {"type": str, "number": str|None, "label": str|None,
-         "text": str, "parent_article": str|None, "parent_section": str|None}
-        """
+        """逐行扫描文本，返回层级列表；每个 dict 含 type / number / label / text / parent_article / parent_section 六个字段。"""
         lines = text.split("\n")
         hierarchy: list[dict] = []
         current_article: Optional[str] = None
@@ -80,7 +72,7 @@ class StructureExtractor:
                     "parent_section": current_section,
                 })
             else:
-                # Body text — attach to current section or article
+                # 正文段落：挂到当前小节或当前条下
                 if current_section:
                     hierarchy.append({
                         "type": "body_text",
@@ -99,10 +91,7 @@ class StructureExtractor:
         return hierarchy
 
     def extract_definitions(self, text: str) -> list[dict]:
-        """Find legal term definitions like 'Person' means...
-
-        Returns list of dicts with keys: term, definition, context.
-        """
+        """找「'Person' means …」这类术语定义，返回若干 dict，含 term、definition、context。"""
         definitions: list[dict] = []
         for m in self.PATTERNS["definition"].finditer(text):
             term = m.group(1)

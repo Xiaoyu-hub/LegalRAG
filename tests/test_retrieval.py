@@ -1,10 +1,10 @@
-"""Tests for hybrid search and reranking."""
+"""混合检索与重排的测试。"""
 import pytest
 import numpy as np
 
 
 def get_1024d_embeddings(n: int) -> np.ndarray:
-    """Generate L2-normalized 1024D embeddings for testing."""
+    """为测试造 1024 维、已 L2 归一化的向量。"""
     embeddings = np.random.randn(n, 1024).astype(np.float32)
     embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
     return embeddings
@@ -12,7 +12,7 @@ def get_1024d_embeddings(n: int) -> np.ndarray:
 
 class TestHybridSearch:
     def test_hybrid_search_returns_results(self):
-        """After building indexes, hybrid search returns top-K results."""
+        """建好索引后，混合检索返回前 K 条。"""
         from backend.retrieval.hybrid_search import HybridSearch
         from backend.retrieval.vector_search import VectorSearch
         from backend.retrieval.bm25 import BM25Retriever
@@ -38,7 +38,7 @@ class TestHybridSearch:
         assert all(isinstance(r[0], int) and isinstance(r[1], float) for r in results)
     
     def test_hybrid_search_score_range(self):
-        """Hybrid scores are in [0, 1] range after normalization."""
+        """归一化之后融合分数落在 [0,1]。"""
         from backend.retrieval.hybrid_search import HybridSearch
         from backend.retrieval.vector_search import VectorSearch
         from backend.retrieval.bm25 import BM25Retriever
@@ -63,14 +63,14 @@ class TestHybridSearch:
             assert 0.0 <= score <= 1.0, f"Score {score} not in [0, 1]"
     
     def test_hybrid_search_alpha_default(self):
-        """Default alpha=0.7 vector, 0.3 BM25 per D-15."""
+        """D-15 定的默认权重：向量 0.7、BM25 0.3。"""
         from backend.retrieval.hybrid_search import HybridSearch
         
         hybrid = HybridSearch()
         assert hybrid.alpha == 0.7
     
     def test_hybrid_search_alpha_pure_vector(self):
-        """alpha=1.0 returns pure vector results."""
+        """alpha=1.0 时退化为纯向量。"""
         from backend.retrieval.hybrid_search import HybridSearch
         from backend.retrieval.vector_search import VectorSearch
         from backend.retrieval.bm25 import BM25Retriever
@@ -94,7 +94,7 @@ class TestHybridSearch:
         assert results[0][0] == 0
     
     def test_hybrid_search_alpha_pure_bm25(self):
-        """alpha=0.0 returns pure BM25 results."""
+        """alpha=0.0 时退化为纯 BM25。"""
         from backend.retrieval.hybrid_search import HybridSearch
         from backend.retrieval.vector_search import VectorSearch
         from backend.retrieval.bm25 import BM25Retriever
@@ -118,7 +118,7 @@ class TestHybridSearch:
         assert results[0][0] == 1
     
     def test_hybrid_search_score_normalization(self):
-        """Verify that raw scores are min-max normalized before fusion."""
+        """确认融合之前两路原始分数都做了 min-max 归一化。"""
         from backend.retrieval.hybrid_search import normalize_scores
         import numpy as np
         
@@ -131,7 +131,7 @@ class TestHybridSearch:
         assert normalized[2] == 1.0
     
     def test_hybrid_search_returns_top_k(self):
-        """Returns exactly top_k results (default=10 per D-18)."""
+        """返回条数恰好是 top_k（D-18 默认 10）。"""
         from backend.retrieval.hybrid_search import HybridSearch
         from backend.retrieval.vector_search import VectorSearch
         from backend.retrieval.bm25 import BM25Retriever
@@ -155,7 +155,7 @@ class TestHybridSearch:
         assert len(results) == 10
     
     def test_hybrid_search_empty_index(self):
-        """Searching empty index returns empty list gracefully."""
+        """空索引检索优雅返回空列表。"""
         from backend.retrieval.hybrid_search import HybridSearch
         from backend.retrieval.vector_search import VectorSearch
         
@@ -171,7 +171,7 @@ class TestHybridSearch:
 
 class TestReranker:
     def test_reranker_returns_top_k(self):
-        """Reranker returns exactly top_k results (default=5 per D-18)."""
+        """重排返回条数恰好是 top_k（D-18 默认 5）。"""
         from backend.retrieval.reranker import Reranker
         
         try:
@@ -185,7 +185,7 @@ class TestReranker:
         assert len(results) == 5
     
     def test_reranker_scores_decreasing(self):
-        """Reranked results are sorted by score descending."""
+        """重排结果按分数降序。"""
         from backend.retrieval.reranker import Reranker
         
         try:
@@ -200,7 +200,7 @@ class TestReranker:
         assert scores == sorted(scores, reverse=True)
     
     def test_reranker_returns_metadata(self):
-        """Each result has corpus_id, score, and text fields."""
+        """每条结果含 corpus_id、score、text 三个字段。"""
         from backend.retrieval.reranker import Reranker
         
         try:
@@ -220,7 +220,7 @@ class TestReranker:
             assert isinstance(r["text"], str)
     
     def test_reranker_empty_input(self):
-        """Empty passages list returns empty list."""
+        """候选为空时返回空列表。"""
         from backend.retrieval.reranker import Reranker
         
         try:
@@ -311,7 +311,7 @@ class TestFullRetrievalPipeline:
             assert result["chunk"].text is not None
     
     def test_retrieve_top5_has_correct_structure(self):
-        """Each result dict has keys: chunk (with id/article/section/text), score."""
+        """每条结果的 dict 含 chunk（带 id/article/section/text）与 score。"""
         from backend.retrieval.reranker import Reranker
         
         try:

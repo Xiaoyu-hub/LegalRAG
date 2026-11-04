@@ -1,8 +1,4 @@
-"""LLM-as-Judge evaluation module using Ollama.
-
-Per EVAL-04: Uses a local LLM to evaluate generation quality and citation usage.
-Judge prompt templates are loaded from configs/prompts.yaml.
-"""
+"""LLM 评委模块（走 Ollama）。EVAL-04：用本地模型评生成质量与引用使用情况；评委的提示词模板从 configs/prompts.yaml 加载。"""
 
 import json
 from typing import Optional
@@ -13,15 +9,10 @@ from backend.models.chunk import Chunk
 
 
 class RelevanceJudge:
-    """LLM-as-Judge for evaluating legal answer relevance and citation quality.
-
-    Uses Ollama with a local model to score answers based on correctness
-    and proper citation usage. Operates at temperature=0.0 for determinism.
-
-    Attributes:
-        model: Ollama model name (default: llama3.1:8b)
-        config_path: Path to prompts YAML config
-    """
+    """用 LLM 当评委，评法条问答的相关性与引用质量。依据答案正确性与引用是否恰当打分；temperature=0.0 保证同一输入打分稳定。
+    属性：
+    - model：Ollama 模型名（默认 llama3.1:8b）
+    - config_path：提示词配置路径"""
 
     def __init__(self, model: str = "llama3.1:8b", config_path: str = "configs/prompts.yaml"):
         self.model = model
@@ -29,7 +20,7 @@ class RelevanceJudge:
         self._load_templates()
 
     def _load_templates(self):
-        """Load judge prompt templates from prompts.yaml."""
+        """从 prompts.yaml 读取评委的提示词模板。"""
         with open(self.config_path) as f:
             config = yaml.safe_load(f)
         judge_config = config.get("evaluation", {})
@@ -37,11 +28,7 @@ class RelevanceJudge:
         self.judge_user_template = Template(judge_config.get("judge_user", ""))
 
     def _format_sources(self, chunks: list[Chunk]) -> str:
-        """Format chunks as source text lines for judge prompt.
-
-        Formats each chunk as "[Article X, Section Y]: text" and skips
-        chunks without article/section. Text is truncated to 200 chars.
-        """
+        """把检索到的片段整理成评委提示词里的出处行，格式为「[Article X, Section Y]: 正文」；缺 article/section 的片段跳过，正文截断到 200 字符。"""
         source_lines = []
         for c in chunks:
             if not c.article or not c.section:
@@ -51,21 +38,15 @@ class RelevanceJudge:
         return "\n\n".join(source_lines)
 
     def evaluate(self, query: str, answer: str, chunks: list[Chunk]) -> dict:
-        """Evaluate answer relevance and citation usage.
-
-        Calls Ollama with the judge prompt, parses JSON response.
-
-        Args:
-            query: The original question
-            answer: The generated answer
-            chunks: Source chunks used for generation
-
-        Returns:
-            dict with keys:
-                - score (int or None): Relevance score 1-5, or None on error
-                - reasoning (str): Judge's explanation
-                - error (str or None): Error message if something went wrong
-        """
+        """评答案的相关性与引用使用情况：把评委提示词发给 Ollama，再解析它返回的 JSON。
+        参数：
+        - query：用户原始问题
+        - answer：生成出来的答案
+        - chunks：本次生成所依据的片段
+        返回 dict：
+        - score（int 或 None）：1–5 分，出错时为 None
+        - reasoning（str）：评委给出的理由
+        - error（str 或 None）：出错信息"""
         sources = self._format_sources(chunks) if chunks else ""
         user_prompt = self.judge_user_template.render(
             query=query, answer=answer, sources=sources

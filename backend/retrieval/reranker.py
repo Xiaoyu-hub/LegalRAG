@@ -1,11 +1,7 @@
-"""Cross-encoder reranker for improving top-K result quality.
-
-Per D-17: cross-encoder/ms-marco-MiniLM-L-6-v2 (lightweight, CPU-friendly).
-Per D-18: Takes top-10 from hybrid, returns top-5 after reranking.
-
-CRITICAL (Pitfall 4): Cross-encoder has 512-token max length.
-Chunks exceeding this get truncated by the tokenizer.
-"""
+"""cross-encoder 重排器：把召回结果精排一遍。
+- D-17：用 ms-marco-MiniLM-L-6-v2（轻量、CPU 可跑）
+- D-18：接混合检索给的 10 条候选，重排后留 5 条
+关键（第 4 个坑）：cross-encoder 最长 512 token，超长片段会被分词器截断，尾部信息直接丢。"""
 import os
 import urllib.request
 import ssl
@@ -45,17 +41,13 @@ def _local_cache_dirs() -> list[str]:
 
 
 class Reranker:
-    """Cross-encoder reranker using ms-marco-MiniLM-L-6-v2."""
+    """cross-encoder 重排器，模型是 ms-marco-MiniLM-L-6-v2。"""
     
     _instance = None
     _model_name = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     
     def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
-        """Initialize reranker with cross-encoder model.
-        
-        Handles SSL certificate issues by downloading model to local cache
-        if hub download fails.
-        """
+        """加载 cross-encoder 模型。hub 下载失败（常见于证书/网络问题）时，回退到本地缓存的 snapshot 目录。"""
         if Reranker._instance is not None:
             raise RuntimeError("Use Reranker.get_instance() instead")
         
@@ -74,7 +66,7 @@ class Reranker:
     
     @classmethod
     def get_instance(cls, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
-        """Get singleton instance of Reranker."""
+        """取重排器单例。"""
         if cls._instance is None:
             cls._instance = cls(model_name)
         return cls._instance
@@ -85,17 +77,12 @@ class Reranker:
         passages: list[str],
         top_k: int = 5
     ) -> list[dict]:
-        """Rank passages by relevance to query using cross-encoder.
-        
-        Args:
-            query: The user's search query
-            passages: List of passage text strings to rerank
-            top_k: Number of top results to return (default 5 per D-18)
-            
-        Returns:
-            List of dicts with keys: corpus_id, score, text
-            Sorted by score descending
-        """
+        """用 cross-encoder 给候选片段按与查询的相关性重新打分排序。
+        参数：
+        - query：用户查询
+        - passages：待重排的片段文本列表
+        - top_k：返回条数（D-18 定 5）
+        返回：dict 列表，含 corpus_id、score、text，按分数降序"""
         if not passages:
             return []
 

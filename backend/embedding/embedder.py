@@ -1,14 +1,12 @@
-"""Embedder using BGE-large-en-v1.5 via SentenceTransformer.
-
-Per D-11: BGE-large-en-v1.5 embedding model.
-Per D-12: batch_size=32 for embedding generation.
-Singleton pattern - one model instance shared across the app.
-"""
+"""向量模型封装：用 SentenceTransformer 加载 BGE-large-en-v1.5。
+- D-11：选用 BGE-large-en-v1.5
+- D-12：批量编码 batch_size=32
+- 单例模式：全应用共享一个模型实例（模型很重，不能每次请求都加载）"""
 import os
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-# Per BGE specification: for short query to long passage (s2p)
+# BGE 官方建议：短查询检索长段落（s2p）时，查询侧要加这句指令
 QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
 
 DEFAULT_MODEL = "BAAI/bge-large-en-v1.5"
@@ -60,19 +58,15 @@ class Embedder:
         return cls._instance
 
     def encode(self, texts: list[str]) -> np.ndarray:
-        """Encode passages (no instruction prepended).
-        Returns float32 array of shape (n_texts, 1024) with L2-normalized vectors.
-        """
+        """编码文档段落（不加指令前缀）。返回 (n_texts, 1024) 的 float32 数组，向量已做 L2 归一化。"""
         return self.model.encode(
             texts,
             normalize_embeddings=True,
-            batch_size=32,  # Per D-12
+            batch_size=32,  # D-12：批量 32
         )
 
     def encode_query(self, query: str) -> np.ndarray:
-        """Encode query with instruction prepended.
-        Returns float32 array of shape (1024,) with L2-normalized vector.
-        """
+        """编码查询（前置 BGE 指令）。返回 (1024,) 的 float32 向量，已 L2 归一化。"""
         return self.model.encode(
             [QUERY_INSTRUCTION + query],
             normalize_embeddings=True,
@@ -81,7 +75,7 @@ class Embedder:
 
     @property
     def dimension(self) -> int:
-        # Use new API name; fall back to old one for older sentence-transformers
+        # 优先用新版 API 名，老版本 sentence-transformers 回退到旧方法名
         try:
             return self.model.get_embedding_dimension()
         except AttributeError:

@@ -1,31 +1,26 @@
-"""Integration and unit tests for the document ingestion pipeline.
-
-Tests cover PDF parsing, structure extraction, legal-aware chunking,
-definition extraction, and SQLite metadata storage.
-All tests in this file should fail until the implementation modules are built.
-"""
+"""入库流水线的集成与单元测试，覆盖 PDF 解析、结构抽取、法条感知分块、术语定义抽取与 SQLite 元数据存储。实现没写完之前，本文件里的用例都应当失败。"""
 
 import pytest
 
 
-# ── PDF Parser Tests ──────────────────────────────────────────────────────────
+# ── PDF 解析测试 ──
 
 class TestPDFParser:
     def test_pdf_parser_returns_text(self):
-        """PDFParser should extract text from a PDF file."""
+        """PDFParser 应能从 PDF 抽出文本。"""
         from backend.pipeline.parser import PDFParser
         parser = PDFParser()
-        # Without a real PDF, we cannot test the parser fully in Task 1.
-        # This test validates the class can be instantiated.
+        # 当时手上没有真 PDF，解析器只能做有限验证。
+        # 这条只验证类能被实例化。
         assert parser is not None
         assert hasattr(parser, "extract_text")
 
 
-# ── Structure Extractor Tests ─────────────────────────────────────────────────
+# ── 结构抽取测试 ──
 
 class TestStructureExtractor:
     def test_structure_extractor_detects_articles(self, sample_pdf_text):
-        """Should detect Article I, Article II, Article III from the fixture."""
+        """应能从样例里识别出 Article I、II、III。"""
         from backend.pipeline.structure_extractor import StructureExtractor
         extractor = StructureExtractor()
         structure = extractor.extract(sample_pdf_text)
@@ -37,7 +32,7 @@ class TestStructureExtractor:
         assert "III" in article_numbers, f"Article III not found: {article_numbers}"
 
     def test_structure_extractor_detects_sections(self, sample_pdf_text):
-        """Should detect sections like Section 1, Section 2, etc."""
+        """应能识别 Section 1、Section 2 这类小节。"""
         from backend.pipeline.structure_extractor import StructureExtractor
         extractor = StructureExtractor()
         structure = extractor.extract(sample_pdf_text)
@@ -45,18 +40,18 @@ class TestStructureExtractor:
         assert len(sections) >= 6, f"Expected at least 6 sections, got {len(sections)}"
 
     def test_structure_extractor_detects_subsections(self, sample_pdf_text):
-        """Should detect subsections like (a), (b), (c), (d)."""
+        """应能识别 (a)、(b)、(c) 这类子项。"""
         from backend.pipeline.structure_extractor import StructureExtractor
         extractor = StructureExtractor()
         structure = extractor.extract(sample_pdf_text)
         subsections = [e for e in structure if e["type"] == "subsection"]
         assert len(subsections) >= 6, f"Expected at least 6 subsections, got {len(subsections)}"
-        # Verify subsection labels
+        # 核对子项标签
         labels = [s.get("label") for s in subsections]
         assert "a" in labels, f"Subsection (a) not found: {labels}"
 
     def test_structure_extractor_tracks_parent_article(self, sample_pdf_text):
-        """Section and subsection elements should have parent_article populated."""
+        """小节与子项元素都应带上所属条号 parent_article。"""
         from backend.pipeline.structure_extractor import StructureExtractor
         extractor = StructureExtractor()
         structure = extractor.extract(sample_pdf_text)
@@ -70,24 +65,24 @@ class TestStructureExtractor:
                 f"Subsection {sub.get('label')} missing parent_article"
 
 
-# ── Legal Chunker Tests ───────────────────────────────────────────────────────
+# ── 法条分块测试 ──
 
 class TestLegalChunker:
     def test_legal_chunker_by_section_default(self, sample_pdf_text):
-        """By-section chunking should create one chunk per section."""
+        """按小节分块时，每个 Section 生成一个 chunk。"""
         from backend.pipeline.structure_extractor import StructureExtractor
         from backend.pipeline.legal_chunker import LegalChunker
         extractor = StructureExtractor()
-        chunker = LegalChunker()  # default: by_section
+        chunker = LegalChunker()  # 默认策略：by_section
         structure = extractor.extract(sample_pdf_text)
         chunks = chunker.chunk(structure, sample_pdf_text)
         assert len(chunks) >= 6, f"Expected at least 6 chunks, got {len(chunks)}"
-        # Each chunk should have text
+        # 每个 chunk 都要有正文
         for c in chunks:
             assert c.text, "Chunk should have non-empty text"
 
     def test_legal_chunker_by_article(self, sample_pdf_text):
-        """By-article chunking should create one chunk per article."""
+        """按条分块时，每个 Article 生成一个 chunk。"""
         from backend.pipeline.structure_extractor import StructureExtractor
         from backend.pipeline.legal_chunker import LegalChunker
         extractor = StructureExtractor()
@@ -97,7 +92,7 @@ class TestLegalChunker:
         assert len(chunks) >= 3, f"Expected at least 3 article chunks, got {len(chunks)}"
 
     def test_chunk_metadata_preserved(self, sample_pdf_text):
-        """Each chunk should have article, section, title, parent_article metadata."""
+        """每个 chunk 都要带上 article、section、title、parent_article 元数据。"""
         from backend.pipeline.structure_extractor import StructureExtractor
         from backend.pipeline.legal_chunker import LegalChunker
         extractor = StructureExtractor()
@@ -113,11 +108,11 @@ class TestLegalChunker:
                 f"Expected strategy by_section, got {chunk.strategy}"
 
 
-# ── Definition Extraction Tests ───────────────────────────────────────────────
+# ── 定义抽取测试 ──
 
 class TestDefinitionExtraction:
     def test_definition_extraction(self, sample_pdf_text):
-        """Should extract legal term definitions like 'Person' means..."""
+        """应能抽出「'Person' means …」这类定义句。"""
         from backend.pipeline.structure_extractor import StructureExtractor
         extractor = StructureExtractor()
         definitions = extractor.extract_definitions(sample_pdf_text)
@@ -127,7 +122,7 @@ class TestDefinitionExtraction:
         assert "Entity" in terms, f"Definition for 'Entity' not found: {terms}"
 
     def test_definition_has_context(self, sample_pdf_text):
-        """Each definition should include context around the term."""
+        """每条定义都要带上术语前后的上下文。"""
         from backend.pipeline.structure_extractor import StructureExtractor
         extractor = StructureExtractor()
         definitions = extractor.extract_definitions(sample_pdf_text)
@@ -138,11 +133,11 @@ class TestDefinitionExtraction:
                 f"Definition for '{d.get('term')}' missing context"
 
 
-# ── Metadata Store Tests ──────────────────────────────────────────────────────
+# ── 元数据存储测试 ──
 
 class TestMetadataStore:
     def test_metadata_store_insert_document(self, temp_db_path):
-        """Should insert a document into SQLite and return its ID."""
+        """插入文档后应返回它自增出来的 id。"""
         from backend.storage.metadata_store import MetadataStore
         from backend.models.document import Document
         store = MetadataStore(db_path=temp_db_path)
@@ -154,7 +149,7 @@ class TestMetadataStore:
         assert doc_id > 0, f"Expected positive doc_id, got {doc_id}"
 
     def test_metadata_store_retrieve_document(self, temp_db_path):
-        """Should retrieve a document by its ID."""
+        """应能按 id 取回文档。"""
         from backend.storage.metadata_store import MetadataStore
         from backend.models.document import Document
         store = MetadataStore(db_path=temp_db_path)
@@ -167,7 +162,7 @@ class TestMetadataStore:
         assert retrieved.title == "Test Document"
 
     def test_metadata_store_chunk_count(self, temp_db_path):
-        """After inserting chunks, chunk count should reflect them."""
+        """插入 chunk 后，计数应与实际条数一致。"""
         from backend.storage.metadata_store import MetadataStore
         from backend.models.document import Document
         from backend.models.chunk import Chunk
@@ -184,36 +179,36 @@ class TestMetadataStore:
         assert store.get_chunk_count() == 3
 
 
-# ── Full Integration Pipeline Test ─────────────────────────────────────────────
+# ── 全链路集成测试 ──
 
 class TestIntegrationPipeline:
     def test_full_ingestion_pipeline(self, sample_pdf_text, temp_db_path):
-        """End-to-end test: parse → extract → chunk → store."""
+        """端到端：解析 → 抽结构 → 分块 → 落库。"""
         from backend.pipeline.structure_extractor import StructureExtractor
         from backend.pipeline.legal_chunker import LegalChunker
         from backend.storage.metadata_store import MetadataStore
         from backend.models.document import Document
 
-        # Extract structure
+        # 抽结构
         extractor = StructureExtractor()
         structure = extractor.extract(sample_pdf_text)
 
-        # Verify structure
+        # 核对结构
         articles = [e for e in structure if e["type"] == "article"]
         sections = [e for e in structure if e["type"] == "section"]
         assert len(articles) >= 3
         assert len(sections) >= 6
 
-        # Extract definitions
+        # 抽定义
         definitions = extractor.extract_definitions(sample_pdf_text)
         assert len(definitions) >= 2
 
-        # Chunk
+        # 分块
         chunker = LegalChunker()
         chunks = chunker.chunk(structure, sample_pdf_text)
         assert len(chunks) >= 6
 
-        # Store
+        # 落库
         store = MetadataStore(db_path=temp_db_path)
         doc = Document(filename="sample_legal.txt", title="Sample Regulation",
                        page_count=1, file_path="data/test/sample_legal.txt",
@@ -222,13 +217,13 @@ class TestIntegrationPipeline:
         store.insert_chunks(doc_id, chunks)
         store.insert_definitions(doc_id, definitions)
 
-        # Verify storage
+        # 核对落库结果
         assert store.get_chunk_count() >= 6
         retrieved = store.get_document(doc_id)
         assert retrieved is not None
         assert retrieved.title == "Sample Regulation"
 
-        # Verify chunk text content
+        # 核对 chunk 正文内容
         chunk_texts = store.get_chunk_texts()
         assert any("General Provisions" in t for t in chunk_texts), \
             "Chunks should contain 'General Provisions'"

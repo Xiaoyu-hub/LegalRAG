@@ -1,15 +1,12 @@
-"""FastAPI application entry point for LegalRAG.
-
-Per CONTEXT.md D-01~D-08:
-  - D-01: Routes organized by resource (documents router registered here).
-  - D-02: Engine instances as app.state singletons.
-  - D-03: API prefix /api/v1.
-  - D-04: Global exception handlers.
-  - D-05: Async document indexing via BackgroundTasks.
-  - D-06: Unified response wrapper.
-  - D-07: Health check endpoint.
-  - D-08: CORS permissive in development.
-"""
+"""LegalRAG 的 FastAPI 应用入口。对应设计约定 D-01~D-08：
+- D-01：路由按资源拆分（documents 路由在此注册）
+- D-02：引擎实例挂到 app.state 作为单例
+- D-03：接口前缀 /api/v1
+- D-04：全局异常处理器
+- D-05：文档索引用 BackgroundTasks 异步跑
+- D-06：统一响应包装
+- D-07：健康检查端点
+- D-08：开发阶段 CORS 放开"""
 import logging
 import os
 import sqlite3
@@ -35,7 +32,7 @@ if not logging.getLogger().handlers:
     )
     logging.getLogger("backend").setLevel(logging.INFO)
 
-# ── App Factory ────────────────────────────────────────────────────────────
+# ── 应用构造 ──
 
 app = FastAPI(
     title="LegalRAG API",
@@ -43,7 +40,7 @@ app = FastAPI(
     description="Backend API for LegalRAG — Legal Document Q&A System",
 )
 
-# ── CORS (D-08) ────────────────────────────────────────────────────────────
+# ── CORS 跨域（D-08）──
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,33 +50,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Unified Error Response ─────────────────────────────────────────────────
+# ── 统一错误响应 ──
 
 
 def _error_response(status_code: int, detail: str) -> JSONResponse:
-    """Return a unified error response per D-06."""
+    """按 D-06 返回统一格式的错误响应。"""
     return JSONResponse(
         status_code=status_code,
         content={"status": "error", "data": None, "error": detail},
     )
 
 
-# ── Exception Handlers (D-04) ──────────────────────────────────────────────
+# ── 异常处理器（D-04）──
 
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
-    """Catch all unhandled exceptions and return unified error response."""
+    """兜住所有未处理异常，转成统一格式的错误响应。"""
     logger.error("Unhandled exception: %s", exc, exc_info=True)
     return _error_response(500, f"Internal server error: {exc}")
 
 
-# ── Lifecycle Events ───────────────────────────────────────────────────────
+# ── 生命周期事件 ──
 
 
 @app.on_event("startup")
 async def startup():
-    """Initialise app-level singletons (D-02, D-05)."""
+    """初始化应用级单例（D-02、D-05）。"""
     from backend.storage.metadata_store import MetadataStore
     from backend.pipeline.indexer import Indexer
     from backend.retrieval.vector_search import VectorSearch
@@ -87,7 +84,7 @@ async def startup():
 
     logger.info("Starting LegalRAG API — initialising singletons")
 
-    # Engine singletons
+    # 引擎单例
     app.state.metadata_store = MetadataStore()
     # 按租户建 Indexer：每个租户一套向量索引 + BM25，文件目录也分开
     app.state.indexers = {}
@@ -143,9 +140,9 @@ async def startup():
         except Exception as exc:
             logger.warning("[%s] Could not rebuild BM25: %s", tenant, exc)
 
-    # Per-document async processing status (D-05)
+    # 每个文档的异步处理状态（D-05）
     app.state.processing_status = {}
-    # Mark documents that already have chunks as "ready"
+    # 已有 chunk 的文档标记为 ready
     try:
         import sqlite3 as _sqlite3
         conn = _sqlite3.connect(app.state.metadata_store.db_path)
@@ -221,11 +218,11 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
-    """Log shutdown event."""
+    """记录关闭事件。"""
     logger.info("LegalRAG API shutting down")
 
 
-# ── Routes (D-03) ──────────────────────────────────────────────────────────
+# ── 路由注册（D-03）──
 
 app.include_router(documents_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
@@ -233,7 +230,7 @@ app.include_router(search_router, prefix="/api/v1")
 app.include_router(gateway_router, prefix="/api/v1")
 
 
-# ── Health Endpoint (D-07) ─────────────────────────────────────────────────
+# ── 健康检查端点（D-07）──
 
 
 # ── Prometheus 指标出口（D-07 之外单独一个路径，方便 scrape 配置）──
@@ -251,8 +248,8 @@ async def metrics():
 
 @app.get("/api/v1/health")
 async def health(request: Request):
-    """Check system health: Ollama, SQLite, FAISS, BM25, Embedder."""
-    # --- SQLite ---
+    """检查各组件健康状态：Ollama、SQLite、FAISS、BM25、向量模型。"""
+    # --- SQLite 元数据库 ---
     try:
         conn = sqlite3.connect(request.app.state.metadata_store.db_path)
         conn.execute("SELECT 1")
@@ -279,7 +276,7 @@ async def health(request: Request):
         faiss_status = bm25_status = "error"
         faiss_tenants = {}
 
-    # --- Ollama ---
+    # --- Ollama 本地模型 ---
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(2.0)) as client:
             resp = await client.get("http://localhost:11434/api/tags")
@@ -287,9 +284,9 @@ async def health(request: Request):
     except Exception:
         ollama_status = "error"
 
-    # --- BM25 ---
+    # --- BM25 关键词索引 ---
 
-    # --- Embedder ---
+    # --- 向量模型 ---
     from backend.embedding.embedder import Embedder
     try:
         embedder = Embedder.get_instance()

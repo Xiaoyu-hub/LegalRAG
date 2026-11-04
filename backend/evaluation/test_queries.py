@@ -25,7 +25,7 @@ Expected chunk layout (by_section chunking of sample_legal.txt):
 """
 
 TEST_QUERIES = [
-    # === Definition queries (category: "definition") ===
+    # === 定义类查询（category=definition）===
     {
         "query": "What is the definition of a Person under this regulation?",
         "relevant_chunk_ids": {1},
@@ -51,7 +51,7 @@ TEST_QUERIES = [
         "notes": "Tests whether definition extraction captures Entity scope including government"
     },
 
-    # === Scope queries (category: "scope") ===
+    # === 适用范围类查询（category=scope）===
     {
         "query": "Who has to comply with these regulations?",
         "relevant_chunk_ids": {2},
@@ -71,7 +71,7 @@ TEST_QUERIES = [
         "notes": "Tests exclusion for governmental activities in exercise of sovereign authority"
     },
 
-    # === Obligation queries (category: "obligation") ===
+    # === 义务类查询（category=obligation）===
     {
         "query": "What are the obligations of data controllers regarding security?",
         "relevant_chunk_ids": {5},
@@ -91,7 +91,7 @@ TEST_QUERIES = [
         "notes": "Tests obligation to maintain record of all processing activities"
     },
 
-    # === Penalty queries (category: "penalty") ===
+    # === 处罚类查询（category=penalty）===
     {
         "query": "What is the maximum fine for violating data protection rights?",
         "relevant_chunk_ids": {9},
@@ -111,7 +111,7 @@ TEST_QUERIES = [
         "notes": "Tests cross-article: Regulatory Authority powers (Art III Sec 1) + fines (Art III Sec 3)"
     },
 
-    # === Prohibition queries (category: "prohibition") ===
+    # === 禁止类查询（category=prohibition）===
     {
         "query": "What data processing activities are not allowed under this regulation?",
         "relevant_chunk_ids": {4},
@@ -125,7 +125,7 @@ TEST_QUERIES = [
         "notes": "Tests right to erasure — 'right to be forgotten' when data no longer necessary"
     },
 
-    # === Rights queries (category: "rights") ===
+    # === 权利类查询（category=rights）===
     {
         "query": "What rights do data subjects have regarding their personal data?",
         "relevant_chunk_ids": {4},
@@ -151,7 +151,7 @@ TEST_QUERIES = [
         "notes": "Tests right of access to personal data held by data controller"
     },
 
-    # === Procedure queries (category: "procedure") ===
+    # === 程序类查询（category=procedure）===
     {
         "query": "What is the process for filing a complaint about data processing?",
         "relevant_chunk_ids": {10, 8},
@@ -179,9 +179,9 @@ TEST_QUERIES = [
 ]
 
 
-# QUERY_ANNOTATIONS: Optional ground-truth annotations for judge calibration
-# Maps sequential test query index to expected citation and relevance data.
-# These are optional — entries without annotations still work fine.
+# QUERY_ANNOTATIONS：可选的标准答案标注，用来校准评委
+# 把测试查询的下标映射到「期望引用 + 期望相关性」。
+# 这些标注是可选的：没标注的条目照样能跑。
 QUERY_ANNOTATIONS = {
     10: {  # "What is the maximum fine for violating data protection rights?"
         "expected_citations": [{"article": "III", "section": "3"}],
@@ -206,11 +206,11 @@ QUERY_ANNOTATIONS = {
 }
 
 QUERY_CATEGORIES = [
-    "definition",    # Queries about defined legal terms
-    "scope",         # Queries about scope/application
-    "obligation",    # Queries about duties/requirements
-    "penalty",       # Queries about penalties/consequences
-    "prohibition",   # Queries about prohibited conduct
-    "rights",        # Queries about rights/entitlements
-    "procedure",     # Queries about procedural requirements
+    "definition",    # 围绕法定术语定义的查询
+    "scope",         # 围绕适用范围/对象的查询
+    "obligation",    # 围绕义务/要求的查询
+    "penalty",       # 围绕处罚/后果的查询
+    "prohibition",   # 围绕禁止行为的查询
+    "rights",        # 围绕权利/资格的查询
+    "procedure",     # 围绕程序性要求的查询
 ]

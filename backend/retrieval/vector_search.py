@@ -1,8 +1,6 @@
-"""FAISS vector similarity search.
-
-Per D-13: FAISS with IndexFlatIP for exact similarity search.
-Uses L2-normalized vectors (cosine similarity via inner product).
-"""
+"""FAISS 向量检索。
+- D-13：用 IndexFlatIP 做精确检索（不近似，数据量小的时候最稳）
+- 向量先做 L2 归一化，这样内积等于余弦相似度"""
 import os
 import warnings
 import numpy as np
@@ -18,7 +16,7 @@ class VectorSearch:
         self.tenant = tenant
         self.dimension = dimension
         self._init_index()
-        self.chunk_ids = []  # Maps FAISS index position -> chunk_id
+        self.chunk_ids = []  # FAISS 位置 -> 业务主键的映射表
         self.mapping_trusted = False
 
     def _init_index(self):
@@ -37,13 +35,9 @@ class VectorSearch:
         cls._instances.pop(tenant, None)
 
     def add(self, embeddings: np.ndarray, chunk_ids: list[int] | None = None):
-        """Add embeddings to the index.
-
-        Automatically L2-normalizes if vectors are not unit length.
-        Per D-13 and Pitfall 2: All vectors MUST be unit-length for IndexFlatIP.
-        """
+        """把向量写入索引。发现不是单位长度就自动 L2 归一化——IndexFlatIP 的前提就是所有向量单位长度，否则内积不等于余弦。"""
         import faiss
-        # Check if normalization needed
+        # 检查是否需要对向量做归一化
         norms = np.linalg.norm(embeddings, axis=1)
         if not np.allclose(norms, 1.0, atol=1e-5):
             warnings.warn("Embeddings not normalized. Auto-normalizing.")
@@ -59,16 +53,13 @@ class VectorSearch:
         self.mapping_trusted = len(self.chunk_ids) == self.index.ntotal
 
     def search(self, query_vec: np.ndarray, k: int = 10) -> tuple[np.ndarray, np.ndarray]:
-        """Search index for nearest neighbors.
-
-        Args:
-            query_vec: L2-normalized query vector of shape (dim,)
-            k: Number of results to return
-        Returns:
-            (distances, indices): FAISS result arrays
-        """
+        """检索最近邻。
+        参数：
+        - query_vec：L2 归一化的查询向量，形状 (dim,)
+        - k：返回条数
+        返回：(distances, indices) 两个 FAISS 结果数组；注意 indices 是**索引内部位置**，不是业务主键"""
         import faiss
-        # Ensure query is 2D and normalized
+        # 确保查询向量是二维且已归一化
         query_2d = query_vec.reshape(1, -1).astype(np.float32)
         norms = np.linalg.norm(query_2d, axis=1)
         if not np.allclose(norms, 1.0, atol=1e-5):
@@ -79,7 +70,7 @@ class VectorSearch:
         return distances, indices
 
     def get_chunk_ids_for_indices(self, indices: np.ndarray) -> list[int]:
-        """Map FAISS index positions to chunk IDs."""
+        """把 FAISS 位置映射成业务主键。"""
         return [self.chunk_ids[i] if i != -1 else -1 for i in indices[0]]
 
     def search_ids(self, query_vec: np.ndarray, k: int = 10) -> list[tuple[int, float]]:

@@ -1,8 +1,5 @@
-"""Indexer orchestrator — chains parse → extract → chunk → embed → index → BM25.
-
-Per architecture.md section 2.3 (Core Data Flow):
-PDF → Parser → StructureExtractor → LegalChunker → Embedding → FAISS + BM25
-"""
+"""索引编排器：把「解析 → 抽结构 → 分块 → 向量化 → 入索引 → 建 BM25」串成一条流水线。
+对应 architecture.md 2.3 节的核心数据流：PDF → Parser → StructureExtractor → LegalChunker → Embedding → FAISS + BM25"""
 import os
 
 from backend.pipeline.parser import PDFParser
@@ -51,26 +48,22 @@ class Indexer:
         return None if self._reranker is False else self._reranker
 
     def process_document(self, file_path: str, doc_id: int | None = None) -> int:
-        """Process a single PDF document through the full pipeline.
-
-        Args:
-            file_path: Path to the PDF file.
-            doc_id: Existing document ID (created by API layer). If None,
-                     a new document record is created.
-
-        Returns: doc_id from metadata store.
-        """
-        # 1. Parse PDF
+        """把单个 PDF 走完整条流水线。
+        参数：
+        - file_path：PDF 路径
+        - doc_id：已存在的文档 id（由接口层先建好）；为 None 时这里新建一条文档记录
+        返回：元数据库里的 doc_id"""
+        # 第 1 步：解析 PDF
         raw_text = self.parser.extract_text(file_path)
 
-        # 2. Extract structure
+        # 第 2 步：抽取条文结构
         structure = self.structure_extractor.extract(raw_text)
         definitions = self.structure_extractor.extract_definitions(raw_text)
 
-        # 3. Chunk
+        # 第 3 步：分块
         chunks = self.chunker.chunk(structure, raw_text)
 
-        # 4. Create or reuse document record
+        # 第 4 步：新建或复用文档记录
         if doc_id is None:
             filename = os.path.basename(file_path)
             doc = Document(
@@ -81,7 +74,7 @@ class Indexer:
             )
             doc_id = self.metadata_store.insert_document(doc)
 
-        # 5. Store chunks in SQLite
+        # 第 5 步：chunk 落 SQLite
         # 先清掉同一个 doc 的旧 chunk：重传同名文件时复用 doc_id，不先删就会
         # 在同一个文档下追加两套 chunk（旧 chunk 还留在 FAISS 里，检索出幽灵结果）。
         self._delete_chunks_of(doc_id)
@@ -89,15 +82,15 @@ class Indexer:
         if definitions:
             self.metadata_store.insert_definitions(doc_id, definitions)
 
-        # 6. Retrieve stored chunks to get their assigned IDs
+        # 第 6 步：取回落库后的 chunk，拿到数据库分配的主键
         stored_chunks = self.metadata_store.get_chunks_by_doc_id(doc_id)
         chunk_ids = [c.id for c in stored_chunks]
         chunk_texts = [c.text for c in stored_chunks]
 
-        # 7. Embed chunks
+        # 第 7 步：编码成向量
         embeddings = self.embedder.encode(chunk_texts)
 
-        # 8. Add to FAISS
+        # 第 8 步：写入 FAISS
         self.vector_search.add(embeddings, chunk_ids)
 
         # 9. Rebuild BM25 — 只取本租户的 chunk

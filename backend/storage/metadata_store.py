@@ -6,11 +6,8 @@ from backend.models.chunk import Chunk
 
 
 class MetadataStore:
-    """SQLite-backed metadata storage for documents, chunks, and definitions.
-
-    Per D-14: Store document metadata in SQLite with foreign key relationships.
-    Schema includes: documents, chunks, definitions tables with FK links.
-    """
+    """基于 SQLite 的元数据存储：文档、分段、术语定义三张表。
+    - D-14：用外键把这些表串起来（删文档可级联删分段）"""
 
     def __init__(self, db_path: str = "data/metadata.db"):
         self.db_path = db_path
@@ -249,7 +246,7 @@ class MetadataStore:
         return [c.text for c in self.get_all_chunks(tenant)]
 
     def get_chunks_by_doc_id(self, doc_id: int) -> list[Chunk]:
-        """Retrieve all chunks for a given document, ordered by chunk_index."""
+        """取某个文档的全部 chunk，按 chunk_index 排序。"""
         conn = self._connect()
         c = conn.cursor()
         c.execute(
