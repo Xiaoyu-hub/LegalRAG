@@ -1,13 +1,27 @@
-version: "3.8"
+# 一键部署：Ollama + LegalRAG（API 与前端同源，单容器单端口）
+#
+# 两种用法：
+#   1) 开箱即用（不需要 GPU、不拉模型）
+#        docker compose up -d --build
+#      默认 LLM_PROVIDER=extractive：抽取式基线，不生成，只从召回片段里抽句子并带引用，
+#      检索 / 重排 / 引用校验 / 计量 / 流式照常跑，链路完整但不是 LLM。
+#
+#   2) 带本地模型
+#        LLM_PROVIDER=ollama docker compose --profile llm up -d --build
+#        docker compose exec ollama ollama pull llama3.2:3b
+#
+# 前端已经是静态产物，由 FastAPI 同源托管在 8000，所以没有单独的 frontend 服务。
 
 services:
   ollama:
     image: ollama/ollama:latest
+    profiles: ["llm"]
     volumes:
       - ollama_data:/root/.ollama
     ports:
       - "11434:11434"
     healthcheck:
+      # ollama list 比 curl /api/tags 可靠：镜像里不保证有 curl
       test: ["CMD", "ollama", "list"]
       interval: 30s
       timeout: 10s
@@ -17,29 +31,39 @@ services:
   backend:
     build:
       context: .
-      target: backend
+      target: app
     ports:
       - "8000:8000"
     volumes:
+      # 语料、FAISS 索引、SQLite（metadata / usage / conversations）都在这里
       - ./data:/app/data
+      # BGE-large 1.3GB + 重排模型 87MB：不挂出来每次重建镜像都要重下
+      - hf_cache:/root/.cache/huggingface
     environment:
-      - OLLAMA_HOST=http://ollama:11434
+      # 默认走抽取式基线：只 `docker compose up` 就能问答；
+      # 要用本地模型就 LLM_PROVIDER=ollama 并加 --profile llm
+      - LLM_PROVIDER=${LLM_PROVIDER:-extractive}
+      - LLM_MODEL=${LLM_MODEL:-llama3.2:3b}
+      - LLM_FALLBACK_MODEL=${LLM_FALLBACK_MODEL:-llama3.1:8b}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
+      - PYTHONUTF8=1
     depends_on:
+      # 模型服务只要求「已启动」而不等 healthy：抽取式模式下 ollama 根本不存在
       ollama:
-        condition: service_healthy
-    restart: unless-stopped
-
-  frontend:
-    build:
-      context: .
-      target: frontend
-    ports:
-      - "8501:8501"
-    environment:
-      - API_BASE=http://backend:8000
-    depends_on:
-      - backend
+        condition: service_started
+        required: false
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5).status==200 else 1)"
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
     restart: unless-stopped
 
 volumes:
   ollama_data:
+  hf_cache:

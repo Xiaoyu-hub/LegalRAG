@@ -1,10 +1,32 @@
-.git/
-.gitignore
-.planning/
-__pycache__/
-*.pyc
-.pytest_cache/
-tests/
-*.md
-.DS_Store
-*.db
+# 构建上下文要瘦：Dockerfile 里 `COPY web/ ./` 会把 node_modules 一起拷进构建上下文，
+# `COPY backend/` 同理受 .venv 影响。没有这个文件时上下文可能上百 MB，构建慢且容易误打包。
+.git
+.github
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+
+# 前端依赖与产物（镜像里重新装、重新构建）
+web/node_modules
+web/dist
+
+# 后端依赖产物
+mcp-server/node_modules
+mcp-server/dist
+
+# 运行时数据：语料、索引、三个 SQLite、日志
+data/documents
+data/index
+data/usage.db
+data/conversations.db
+data/e2e_tmp
+data/demo_corpus
+logs
+*.log
+
+# 文档与截图不进镜像
+docs/screenshots
+.planning
