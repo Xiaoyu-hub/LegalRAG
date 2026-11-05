@@ -15,11 +15,14 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.api.chat import router as chat_router
+from backend.api.conversations import router as conversations_router
 from backend.api.documents import router as documents_router
 from backend.api.gateway import router as gateway_router
 from backend.api.search import router as search_router
+from backend.api.stats import router as stats_router
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +89,9 @@ async def startup():
 
     # 引擎单例
     app.state.metadata_store = MetadataStore()
+    # 会话库单独一个文件：它是运行时数据，不跟随仓库提交的 metadata.db 混
+    from backend.storage.conversation_store import ConversationStore
+    app.state.conversation_store = ConversationStore()
     # 按租户建 Indexer：每个租户一套向量索引 + BM25，文件目录也分开
     app.state.indexers = {}
 
@@ -228,6 +234,8 @@ app.include_router(documents_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(search_router, prefix="/api/v1")
 app.include_router(gateway_router, prefix="/api/v1")
+app.include_router(conversations_router, prefix="/api/v1")
+app.include_router(stats_router, prefix="/api/v1")
 
 
 # ── 健康检查端点（D-07）──
@@ -307,3 +315,41 @@ async def health(request: Request):
         },
         "error": None,
     }
+
+
+# ── 前端静态资源（挂在最后）──
+# 前端（web/）构建产物在 web/dist。存在就直接由 FastAPI 托管，少一个 nginx 容器；
+# 不存就不挂，后端 API 仍可单独用。注意 Mount 必须在所有路由之后注册：
+# Starlette 按注册顺序匹配，挂在 / 的静态目录会把前面没注册的路径全吃掉。
+
+WEB_DIST = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "dist"
+)
+
+
+class SPAStaticFiles(StaticFiles):
+    """静态文件找不到时退回 index.html。
+
+    前端是客户端路由（/documents、/chat、/usage），刷新页面时浏览器直接请求
+    这些路径，不兜底就会 404。带扩展名的真资源（.js/.css）不兜底，
+    否则 JS 加载失败会得到一份 HTML 而报语法错。
+    """
+
+    async def get_response(self, path, scope):
+        from starlette.exceptions import HTTPException as StarletteHTTPException
+
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404 and "." not in os.path.basename(path):
+                return await super().get_response("index.html", scope)
+            raise
+
+
+if os.path.isdir(WEB_DIST):
+    app.mount("/", SPAStaticFiles(directory=WEB_DIST, html=True), name="web")
+else:
+    logger.warning(
+        "Frontend bundle not found at %s — 先 cd web && npm run build，或开发时用 vite dev",
+        WEB_DIST,
+    )

@@ -42,6 +42,21 @@ class PDFParser:
 
         raise ValueError("Could not extract text from PDF")
 
+    def page_count(self, file_path: str) -> int:
+        """PDF 页数。
+
+        单独一个方法而不是让 extract_text() 返回元组：现有调用点（单测、e2e、
+        Indexer）都按「返回字符串」写的，改返回值会连锁改一圈，收益不值。
+        取不到就返回 0，让前端显示「—」而不是把整条索引任务弄失败。
+        """
+        try:
+            doc = fitz.open(file_path)
+            count = doc.page_count
+            doc.close()
+            return count
+        except Exception:
+            return 0
+
     def _validate_path(self, file_path: str) -> None:
         """校验路径是否试图目录穿越（T-01-01）。"""
         basename = os.path.basename(file_path)

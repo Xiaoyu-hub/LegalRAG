@@ -9,7 +9,7 @@ def build_provider(kind: str | None = None, model: str | None = None,
     """按 provider 名构造后端。
 
     kind 优先级：显式参数 > 环境变量 LLM_PROVIDER > 默认 "ollama"。
-    取值：ollama | openai | fake
+    取值：ollama | openai | fake | extractive
     """
     from backend.generation.generator import DEFAULT_FALLBACK_MODEL, DEFAULT_MODEL
 
@@ -37,8 +37,14 @@ def build_provider(kind: str | None = None, model: str | None = None,
         latency_ms = float(os.getenv("FAKE_LATENCY_MS", "0") or 0)
         return FakeProvider(latency_sec=latency_ms / 1000.0)
 
+    if kind == "extractive":
+        # 无模型环境的确定性基线：不做生成，只从上下文里抽句子并带引用。
+        # 详细说明见 providers/extractive.py 顶部。
+        from backend.generation.providers.extractive import ExtractiveProvider
+        return ExtractiveProvider(model=model)
+
     raise ValueError(
-        f"Unknown provider {kind!r}; expected one of ollama / openai / fake"
+        f"Unknown provider {kind!r}; expected one of ollama / openai / fake / extractive"
     )
 
 

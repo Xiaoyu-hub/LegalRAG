@@ -55,6 +55,9 @@ class Indexer:
         返回：元数据库里的 doc_id"""
         # 第 1 步：解析 PDF
         raw_text = self.parser.extract_text(file_path)
+        # 页数只有解析时才知道，上传时建的那条记录先填上再往下走
+        if doc_id is not None:
+            self.metadata_store.set_page_count(doc_id, self.parser.page_count(file_path))
 
         # 第 2 步：抽取条文结构
         structure = self.structure_extractor.extract(raw_text)

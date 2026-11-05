@@ -204,3 +204,65 @@ async def get_document_chunks(doc_id: int, request: Request, tenant: str = Depen
             for c in chunks
         ],
     }, None)
+
+
+@router.delete("/{doc_id}")
+async def delete_document(doc_id: int, request: Request,
+                          tenant: str = Depends(resolve_tenant)):
+    """删除文档：库记录 + 磁盘文件 + 索引里的向量，三处都要清。
+
+    只删库不重建索引是这类系统最常见的数据残留 bug：chunk 记录没了，
+    向量还在 FAISS 里，检索会命中「幽灵条文」，拿 chunk_id 回库又查不到。
+    """
+    metadata_store: MetadataStore = request.app.state.metadata_store
+    doc = metadata_store.get_document(doc_id, tenant=tenant)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
+
+    metadata_store.delete_document(doc_id)  # 外键 CASCADE 连带清 chunks / definitions
+    request.app.state.processing_status.pop(doc_id, None)
+
+    # 只删上传目录里的文件：file_path 来自数据库，不该被当成任意路径去 unlink
+    upload_dir = os.path.abspath(os.path.join(UPLOAD_DIR, tenant))
+    file_path = os.path.abspath(doc.file_path) if doc.file_path else ""
+    removed_file = False
+    if file_path and os.path.commonpath([upload_dir, file_path]) == upload_dir \
+            and os.path.exists(file_path):
+        os.remove(file_path)
+        removed_file = True
+
+    indexer = getattr(request.app, "get_indexer", None)
+    remaining = 0
+    if indexer is not None:
+        try:
+            remaining = indexer(tenant).rebuild_all()
+        except Exception as exc:  # 索引重建失败不该让删除操作回滚成 500
+            logger.warning("[%s] Rebuild after delete failed: %s", tenant, exc)
+
+    logger.info("[%s] Deleted document %d (%s), file_removed=%s, %d chunks left",
+                tenant, doc_id, doc.filename, removed_file, remaining)
+    return _unified_response("ok", {
+        "deleted": doc_id,
+        "filename": doc.filename,
+        "file_removed": removed_file,
+        "remaining_chunks": remaining,
+    }, None)
+
+
+@router.post("/{doc_id}/reindex")
+async def reindex_document(doc_id: int, background_tasks: BackgroundTasks,
+                          request: Request, tenant: str = Depends(resolve_tenant)):
+    """重新走一遍解析→分块→向量化。改过切分策略或怀疑索引脏了时用。"""
+    metadata_store: MetadataStore = request.app.state.metadata_store
+    doc = metadata_store.get_document(doc_id, tenant=tenant)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
+    if not os.path.exists(doc.file_path):
+        return _unified_response("error", None, f"File missing on disk: {doc.file_path}")
+
+    request.app.get_indexer(tenant)
+    request.app.state.processing_status[doc_id] = "processing"
+    background_tasks.add_task(
+        process_document_task, doc_id, doc.file_path, request.app.state, True, tenant
+    )
+    return _unified_response("ok", {"document_id": doc_id, "status": "processing"}, None)

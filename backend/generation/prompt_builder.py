@@ -20,7 +20,9 @@ class PromptBuilder:
         self.max_tokens = max_tokens
         self.encoding_name = encoding_name
 
-        with open(config_path, "r") as f:
+        # 必须显式指定 utf-8：Windows 下 open() 默认用 ANSI（GBK），
+        # 而 prompts.yaml 里有中文注释与提示词，按 GBK 读会直接 UnicodeDecodeError
+        with open(config_path, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
         gen_config = config.get("generation", {})

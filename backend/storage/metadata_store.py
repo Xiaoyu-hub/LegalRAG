@@ -131,6 +131,16 @@ class MetadataStore:
         conn.commit()
         conn.close()
 
+    def set_page_count(self, doc_id: int, page_count: int) -> bool:
+        """回写页数：解析阶段才知道真实页数，而文档记录是上传时就建好的。"""
+        conn = self._connect()
+        cur = conn.cursor()
+        cur.execute("UPDATE documents SET page_count = ? WHERE id = ?", (page_count, doc_id))
+        ok = cur.rowcount > 0
+        conn.commit()
+        conn.close()
+        return ok
+
     def document_tenant(self, doc_id: int) -> Optional[str]:
         conn = self._connect()
         row = conn.execute("SELECT tenant FROM documents WHERE id = ?", (doc_id,)).fetchone()

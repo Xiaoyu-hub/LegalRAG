@@ -21,7 +21,8 @@ class RelevanceJudge:
 
     def _load_templates(self):
         """从 prompts.yaml 读取评委的提示词模板。"""
-        with open(self.config_path) as f:
+        # 同 PromptBuilder：Windows 下不写 encoding 会按 GBK 打开 UTF-8 文件直接崩
+        with open(self.config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
         judge_config = config.get("evaluation", {})
         self.judge_system_template = Template(judge_config.get("judge_system", ""))
