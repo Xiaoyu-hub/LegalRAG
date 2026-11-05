@@ -53,12 +53,13 @@ LegalRAG
 │                      LegalRAG                                │
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │              Frontend (Streamlit)                       │ │
-│  │  ┌──────────────┐  ┌────────────────────────────────┐ │ │
-│  │  │  Document    │  │  Chat Interface                │ │ │
-│  │  │  Upload      │  │  - Question input             │ │ │
-│  │  │  & Preview   │  │  - Answer with citations       │ │ │
-│  │  └──────────────┘  └────────────────────────────────┘ │ │
+│  │           Frontend (web/ · React + TypeScript)          │ │
+│  │  ┌──────────────┐  ┌──────────────────────────────┐ │ │
+│  │  │  Documents   │  │  Chat                        │ │ │
+│  │  │  上传 /   状态  │  │  - 流式答案 + 行内引用        │ │ │
+│  │  │  结构预览       │  │  - 召回来源 / 引用校验       │ │ │
+│  │  └──────────────┘  └──────────────────────────────┘ │ │
+│  │  构建产物 web/dist 由 FastAPI 同源托管（单端口）        │ │
 │  └────────────────────────────────────────────────────────┘ │
 │                              ↕                               │
 │  ┌────────────────────────────────────────────────────────┐ │
@@ -89,14 +90,12 @@ LegalRAG
 
 ```
 legalrag/
-├── app/                          # Streamlit 前端
-│   ├── main.py                   # 入口
-│   ├── pages/
-│   │   ├── 1_Documents.py        # 文档上传与管理
-│   │   └── 2_Chat.py             # 问答界面
-│   └── components/
-│       ├── citation_box.py       # 引用展示组件
-│       └── doc_preview.py        # 文档预览组件
+├── web/                          # 前端（React 18 + TypeScript + Vite）
+│   ├── src/api.ts                # 唯一 HTTP 出口：租户头 / 错误归一 / 流式读
+│   ├── src/pages/Documents.tsx   # 上传、状态轮询、结构预览
+│   ├── src/pages/Chat.tsx        # 会话、流式问答、引用与来源
+│   ├── src/pages/Usage.tsx       # 计量、健康、Prometheus
+│   └── src/components/Answer.tsx # 引用高亮（含失效引用）
 │
 ├── backend/                       # FastAPI 后端
 │   ├── main.py                   # FastAPI 入口
@@ -290,7 +289,7 @@ prior written consent before processing personal data [Article III, Section 5(a)
 
 | 层级 | 技术 | 理由 |
 |------|------|------|
-| 前端 | Streamlit | 出活快，Python 原生 |
+| 前端 | React 18 + TypeScript + Vite | 流式渲染与状态管理要细粒度控制，Streamlit 的重跑模型做不到 |
 | 后端 API | FastAPI | 异步，支持长任务（文档解析） |
 | PDF 解析 | PyMuPDF + pdfplumber | 文本和表格提取 |
 | Embedding | BGE-large-en-v1.5 | 英文最优开源嵌入模型，CPU 可跑 |
@@ -324,11 +323,11 @@ prior written consent before processing personal data [Article III, Section 5(a)
 
 ### 阶段 3：UI 与发布（第 4 周）
 
-- [ ] Streamlit 文档上传页面
-- [ ] Streamlit 问答页面（答案 + 引用展示）
-- [ ] Docker 一键部署
-- [ ] README + 截图（英文）
-- [ ] GitHub 发布
+- [x] 文档库页面（上传 / 索引状态轮询 / 结构预览）——实现为 `web/src/pages/Documents.tsx`
+- [x] 问答页面（流式答案 + 引用高亮 + 召回来源）——`web/src/pages/Chat.tsx`
+- [x] Docker 一键部署（四阶段镜像，前后端同源单端口）
+- [x] README + 截图（`docs/screenshots/`）
+- [x] GitHub 发布
 
 ---
 

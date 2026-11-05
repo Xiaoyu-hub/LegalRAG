@@ -22,3 +22,11 @@ data/e2e_tmp/
 
 mcp-server/node_modules/
 mcp-server/dist/
+
+# 前端
+web/node_modules/
+web/dist/
+
+# 会话库（运行时数据）
+data/conversations.db
+data/demo_corpus/
